@@ -9,7 +9,7 @@ from app.repos.audit import AuditRepo
 from app.repos.feedback import FeedbackRepo
 from app.repos.project import ProjectRepo
 from app.schemas.artifact import SearchParams
-from app.services.auth_service import READ_ROLES, WRITE_ROLES
+from app.services.auth_service import READ_ROLES, WRITE_ROLES, Principal
 
 
 class ArtifactService:
@@ -30,6 +30,21 @@ class ArtifactService:
         scope = await self.agent_repo.get_project_scope_by_pk(agent.id, project_pk)
         if scope is None or scope.role not in READ_ROLES:
             raise ForbiddenError("agent lacks read access to project")
+
+    async def _assert_principal_read_scope(
+        self, principal: Principal, project_pk: int
+    ) -> None:
+        if principal.kind == "agent" and principal.agent is not None:
+            await self._assert_agent_read_scope(principal.agent, project_pk)
+            return
+        if principal.kind == "human" and principal.human is not None:
+            scope = await self.project_repo.get_human_scope_by_pk(
+                principal.human.id, project_pk
+            )
+            if scope is None or scope.role not in READ_ROLES:
+                raise ForbiddenError("human lacks read access to project")
+            return
+        raise ForbiddenError("principal lacks read access to project")
 
     async def _resolve_artifact(self, artifact_id: str) -> Artifact:
         artifact = await self.artifact_repo.get_artifact_by_artifact_id(artifact_id)
@@ -101,14 +116,14 @@ class ArtifactService:
 
     async def get_artifact(
         self,
-        agent: Agent,
+        principal: Principal,
         artifact_id: str,
         version: int | None = None,
         include_context: bool = False,
         include_feedback: bool = False,
     ) -> dict:
         artifact = await self._resolve_artifact(artifact_id)
-        await self._assert_agent_read_scope(agent, artifact.project_id)
+        await self._assert_principal_read_scope(principal, artifact.project_id)
 
         version_no = version if version is not None else artifact.current_version
         v = await self.artifact_repo.get_version(artifact.id, version_no)
@@ -170,9 +185,9 @@ class ArtifactService:
 
         return data
 
-    async def list_versions(self, agent: Agent, artifact_id: str) -> list[dict]:
+    async def list_versions(self, principal: Principal, artifact_id: str) -> list[dict]:
         artifact = await self._resolve_artifact(artifact_id)
-        await self._assert_agent_read_scope(agent, artifact.project_id)
+        await self._assert_principal_read_scope(principal, artifact.project_id)
         versions = await self.artifact_repo.get_versions(artifact.id)
         return [
             {
@@ -320,17 +335,26 @@ class ArtifactService:
             "parent_version_no": parent_version_no,
         }
 
-    async def search(self, agent: Agent, params: SearchParams) -> list[dict]:
+    async def search(self, principal: Principal, params: SearchParams) -> list[dict]:
         if params.project_id is not None:
             project = await self.project_repo.get_by_project_id(params.project_id)
             if project is None:
                 raise NotFoundError(
                     "project not found", {"project_id": params.project_id}
                 )
-            await self._assert_agent_read_scope(agent, project.id)
+            await self._assert_principal_read_scope(principal, project.id)
             results = await self.artifact_repo.list_artifacts(params)
         else:
-            scoped_pks = await self.agent_repo.list_agent_project_pks(agent.id)
+            if principal.kind == "agent" and principal.agent is not None:
+                scoped_pks = await self.agent_repo.list_agent_project_pks(
+                    principal.agent.id
+                )
+            elif principal.kind == "human" and principal.human is not None:
+                scoped_pks = await self.project_repo.list_human_project_pks(
+                    principal.human.id
+                )
+            else:
+                scoped_pks = []
             if not scoped_pks:
                 return []
             results = await self.artifact_repo.list_artifacts(params, project_pks=scoped_pks)

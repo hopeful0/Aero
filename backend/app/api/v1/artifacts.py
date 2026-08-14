@@ -2,7 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Query
 
-from app.api.deps import ArtifactSvc, CurrentAgent
+from app.api.deps import ArtifactSvc, CurrentAgent, CurrentPrincipal
 from app.core.response import ok
 from app.schemas.artifact import ForkRequest, NewVersionRequest, PublishRequest, SearchParams
 
@@ -32,7 +32,7 @@ async def publish(body: PublishRequest, agent: CurrentAgent, service: ArtifactSv
 
 @router.get("/artifacts")
 async def search(
-    agent: CurrentAgent,
+    principal: CurrentPrincipal,
     service: ArtifactSvc,
     project_id: str | None = Query(default=None),
     tags: list[str] = Query(default=[]),
@@ -53,21 +53,21 @@ async def search(
         limit=limit,
         offset=offset,
     )
-    results = await service.search(agent, params)
+    results = await service.search(principal, params)
     return ok(results)
 
 
 @router.get("/artifacts/{artifact_id}")
 async def get_artifact(
     artifact_id: str,
-    agent: CurrentAgent,
+    principal: CurrentPrincipal,
     service: ArtifactSvc,
     version: int | None = Query(default=None, ge=1),
     include_context: bool = Query(default=False),
     include_feedback: bool = Query(default=False),
 ):
     data = await service.get_artifact(
-        agent=agent,
+        principal=principal,
         artifact_id=artifact_id,
         version=version,
         include_context=include_context,
@@ -77,8 +77,8 @@ async def get_artifact(
 
 
 @router.get("/artifacts/{artifact_id}/versions")
-async def list_versions(artifact_id: str, agent: CurrentAgent, service: ArtifactSvc):
-    versions = await service.list_versions(agent, artifact_id)
+async def list_versions(artifact_id: str, principal: CurrentPrincipal, service: ArtifactSvc):
+    versions = await service.list_versions(principal, artifact_id)
     return ok(versions)
 
 
