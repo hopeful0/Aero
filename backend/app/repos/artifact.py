@@ -51,12 +51,16 @@ class ArtifactRepo(BaseRepo):
         )
         return result.scalar_one_or_none()
 
-    async def list_artifacts(self, filters: SearchParams) -> list[Artifact]:
+    async def list_artifacts(
+        self, filters: SearchParams, project_pks: list[int] | None = None
+    ) -> list[Artifact]:
         stmt = select(Artifact).where(Artifact.archived_at.is_(None))
         if filters.project_id is not None:
             stmt = stmt.join(Project, Artifact.project_id == Project.id).where(
                 Project.project_id == filters.project_id
             )
+        elif project_pks is not None:
+            stmt = stmt.where(Artifact.project_id.in_(project_pks))
         if filters.tags:
             stmt = stmt.where(Artifact.tags.op("&&")(filters.tags))
         if filters.type is not None:
@@ -159,6 +163,12 @@ class ArtifactRepo(BaseRepo):
             select(ArtifactLineage).where(
                 ArtifactLineage.child_artifact_id == artifact_pk
             )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_context_snapshot(self, snapshot_pk: int) -> ContextSnapshot | None:
+        result = await self.session.execute(
+            select(ContextSnapshot).where(ContextSnapshot.id == snapshot_pk)
         )
         return result.scalar_one_or_none()
 

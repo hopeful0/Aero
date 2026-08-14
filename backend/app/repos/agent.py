@@ -1,6 +1,7 @@
 from sqlalchemy import select
 
-from app.models.agent import Agent
+from app.models.agent import Agent, AgentProjectScope
+from app.models.project import Project
 from app.repos.base import BaseRepo
 
 
@@ -34,3 +35,44 @@ class AgentRepo(BaseRepo):
             select(Agent).where(Agent.token_hash == token_hash)
         )
         return result.scalar_one_or_none()
+
+    async def get_project_scope_by_pk(
+        self, agent_pk: int, project_pk: int
+    ) -> AgentProjectScope | None:
+        result = await self.session.execute(
+            select(AgentProjectScope).where(
+                AgentProjectScope.agent_id == agent_pk,
+                AgentProjectScope.project_id == project_pk,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_project_scope_by_business_id(
+        self, agent_pk: int, project_id: str
+    ) -> AgentProjectScope | None:
+        stmt = (
+            select(AgentProjectScope)
+            .join(Project, AgentProjectScope.project_id == Project.id)
+            .where(
+                AgentProjectScope.agent_id == agent_pk,
+                Project.project_id == project_id,
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def grant_agent_scope(
+        self, agent_pk: int, project_pk: int, role: str
+    ) -> AgentProjectScope:
+        scope = AgentProjectScope(agent_id=agent_pk, project_id=project_pk, role=role)
+        self.session.add(scope)
+        await self.session.flush()
+        return scope
+
+    async def list_agent_project_pks(self, agent_pk: int) -> list[int]:
+        result = await self.session.execute(
+            select(AgentProjectScope.project_id).where(
+                AgentProjectScope.agent_id == agent_pk
+            )
+        )
+        return list(result.scalars().all())
