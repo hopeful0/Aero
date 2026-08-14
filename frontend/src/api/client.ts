@@ -1,10 +1,26 @@
-import axios from 'axios'
+import axios, { type AxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/store/auth'
 
 export const apiClient = axios.create({
   baseURL: '/api/v1',
   withCredentials: true,
   timeout: 30000,
+  paramsSerializer: {
+    serialize: (params: Record<string, unknown>) => {
+      const sp = new URLSearchParams()
+      for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === null) continue
+        if (Array.isArray(value)) {
+          for (const item of value) sp.append(key, String(item))
+        } else if (typeof value === 'boolean') {
+          sp.append(key, value ? 'true' : 'false')
+        } else {
+          sp.append(key, String(value))
+        }
+      }
+      return sp.toString()
+    },
+  },
 })
 
 apiClient.interceptors.request.use((config) => {
@@ -46,3 +62,18 @@ apiClient.interceptors.response.use(
     )
   },
 )
+
+export const http = {
+  get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    return apiClient.get(url, config) as unknown as Promise<T>
+  },
+  post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    return apiClient.post(url, data, config) as unknown as Promise<T>
+  },
+  put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    return apiClient.put(url, data, config) as unknown as Promise<T>
+  },
+  delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    return apiClient.delete(url, config) as unknown as Promise<T>
+  },
+}
