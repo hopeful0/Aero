@@ -46,3 +46,7 @@ docker compose -f deploy/docker-compose.yml up --build
 - 统一响应：`{"data": ...}`；错误：`{"error": {"code","message","details"}}`，依赖 HTTP 状态码。
 - 写操作落 `audit_log`，agent 写操作记 `actor_agent_id` + `on_behalf_of_human_id`。
 - 不加注释，除非必要。
+
+## License
+
+Apache License 2.0。详见 [LICENSE](./LICENSE)。
