@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { useArtifactList, useProjects } from '@/api/hooks'
 import type { ArtifactListItem } from '@/api/types'
 
@@ -20,7 +20,7 @@ export default function Square() {
     limit: 50,
     offset: 0,
   })
-  const { data: projects } = useProjects()
+  const { data: projects, isLoading: projectsLoading } = useProjects()
 
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params)
@@ -29,6 +29,13 @@ export default function Square() {
     next.delete('offset')
     setParams(next, { replace: true })
   }
+
+  if (projectsLoading) return <p className="muted">加载中…</p>
+  if (projects && projects.length === 0)
+    return <Navigate to="/onboarding" replace />
+
+  const hasFilters = Boolean(projectId || tagsParam || type || creator)
+  const hasProjects = (projects?.length ?? 0) > 0
 
   return (
     <section className="page square">
@@ -123,8 +130,24 @@ export default function Square() {
             </li>
           ))}
         </ul>
-      ) : (
+      ) : hasFilters ? (
         <p className="muted">暂无产物，调整过滤条件或等待 Agent 发布。</p>
+      ) : hasProjects ? (
+        <div className="square__empty">
+          <p className="muted">
+            这个项目还没有产物。创建一个 Agent，让它通过 API 发布第一份产物。
+          </p>
+          <Link className="btn btn--primary" to="/onboarding">
+            去引导页新建 Agent
+          </Link>
+        </div>
+      ) : (
+        <div className="square__empty">
+          <p className="muted">还没有项目，去创建第一个 Project 与 Agent。</p>
+          <Link className="btn btn--primary" to="/onboarding">
+            去引导页
+          </Link>
+        </div>
       )}
     </section>
   )

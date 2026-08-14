@@ -4,6 +4,7 @@ import RequireAuth from '@/components/RequireAuth'
 import Health from '@/pages/Health'
 import Login from '@/pages/Login'
 import Square from '@/pages/Square'
+import Onboarding from '@/pages/Onboarding'
 import ProjectView from '@/pages/ProjectView'
 import ArtifactView from '@/pages/ArtifactView'
 
@@ -15,6 +16,7 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
           <Route path="/" element={<Square />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/projects/:projectId" element={<ProjectView />} />
           <Route path="/artifacts/:artifactId" element={<ArtifactView />} />
         </Route>
