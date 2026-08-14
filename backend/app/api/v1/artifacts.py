@@ -2,9 +2,20 @@ from datetime import datetime
 
 from fastapi import APIRouter, Query
 
-from app.api.deps import ArtifactSvc, CurrentAgent, OptionalPrincipal
+from app.api.deps import (
+    ArtifactSvc,
+    CurrentAgent,
+    CurrentHuman,
+    OptionalPrincipal,
+)
 from app.core.response import ok
-from app.schemas.artifact import ForkRequest, NewVersionRequest, PublishRequest, SearchParams
+from app.schemas.artifact import (
+    ForkRequest,
+    NewVersionRequest,
+    PublishRequest,
+    SearchParams,
+    VisibilityUpdateRequest,
+)
 
 router = APIRouter(tags=["artifacts"])
 
@@ -75,6 +86,21 @@ async def get_artifact(
         include_feedback=include_feedback,
     )
     return ok(data)
+
+
+@router.patch("/artifacts/{artifact_id}")
+async def change_visibility(
+    artifact_id: str,
+    body: VisibilityUpdateRequest,
+    human: CurrentHuman,
+    service: ArtifactSvc,
+):
+    result = await service.change_visibility(
+        human=human,
+        artifact_id=artifact_id,
+        visibility=body.visibility,
+    )
+    return ok(result)
 
 
 @router.get("/artifacts/{artifact_id}/versions")

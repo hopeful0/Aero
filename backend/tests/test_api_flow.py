@@ -527,3 +527,116 @@ async def test_visibility(client):
     client.cookies.clear()
     resp = await client.get(f"{BASE}/artifacts/{forked_id}")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_change_visibility(client):
+    owner_email = "cv-owner@example.com"
+    resp = await client.post(
+        f"{BASE}/humans",
+        json={"name": "cv-owner", "email": owner_email, "password": "s3cret-pass"},
+    )
+    assert resp.status_code == 201
+    owner_id = resp.json()["data"]["human_id"]
+
+    resp = await client.post(
+        f"{BASE}/auth/login",
+        json={"email": owner_email, "password": "s3cret-pass"},
+    )
+    assert resp.status_code == 200
+
+    resp = await client.post(f"{BASE}/projects", json={"name": "cv-proj"})
+    assert resp.status_code == 201
+    project_id = resp.json()["data"]["project_id"]
+
+    resp = await client.post(
+        f"{BASE}/agents",
+        json={
+            "name": "cv-agent",
+            "owner_human_id": owner_id,
+            "project_id": project_id,
+            "role": "both",
+        },
+    )
+    assert resp.status_code == 201
+    agent_headers = {"Authorization": f"Bearer {resp.json()['data']['token']}"}
+
+    resp = await client.post(
+        f"{BASE}/artifacts",
+        json={
+            "project_id": project_id,
+            "title": "CV Doc",
+            "artifact_type": "markdown",
+            "content": "# CV",
+            "visibility": "private",
+        },
+        headers=agent_headers,
+    )
+    assert resp.status_code == 201
+    artifact_id = resp.json()["data"]["artifact_id"]
+    assert resp.json()["data"]["visibility"] == "private"
+
+    resp = await client.patch(
+        f"{BASE}/artifacts/{artifact_id}",
+        json={"visibility": "public"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"] == {
+        "artifact_id": artifact_id,
+        "visibility": "public",
+    }
+
+    resp = await client.patch(
+        f"{BASE}/artifacts/{artifact_id}",
+        json={"visibility": "private"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["visibility"] == "private"
+
+    reader_email = "cv-reader@example.com"
+    resp = await client.post(
+        f"{BASE}/humans",
+        json={
+            "name": "cv-reader",
+            "email": reader_email,
+            "password": "s3cret-pass",
+        },
+    )
+    assert resp.status_code == 201
+    resp = await client.post(
+        f"{BASE}/auth/login",
+        json={"email": reader_email, "password": "s3cret-pass"},
+    )
+    assert resp.status_code == 200
+    resp = await client.patch(
+        f"{BASE}/artifacts/{artifact_id}",
+        json={"visibility": "public"},
+    )
+    assert resp.status_code == 403, resp.text
+    assert resp.json()["error"]["code"] == "FORBIDDEN"
+
+    client.cookies.clear()
+    resp = await client.patch(
+        f"{BASE}/artifacts/{artifact_id}",
+        json={"visibility": "public"},
+    )
+    assert resp.status_code == 401, resp.text
+    assert resp.json()["error"]["code"] == "UNAUTHORIZED"
+
+    resp = await client.post(
+        f"{BASE}/auth/login",
+        json={"email": owner_email, "password": "s3cret-pass"},
+    )
+    assert resp.status_code == 200
+    resp = await client.patch(
+        f"{BASE}/artifacts/art_nonexistent_id",
+        json={"visibility": "public"},
+    )
+    assert resp.status_code == 404, resp.text
+    assert resp.json()["error"]["code"] == "NOT_FOUND"
+
+    resp = await client.patch(
+        f"{BASE}/artifacts/{artifact_id}",
+        json={"visibility": "org"},
+    )
+    assert resp.status_code == 422, resp.text

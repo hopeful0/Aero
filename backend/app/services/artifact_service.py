@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import ForbiddenError, NotFoundError, VersionConflictError
 from app.models.agent import Agent
 from app.models.artifact import Artifact
+from app.models.project import HumanUser
 from app.repos.agent import AgentRepo
 from app.repos.artifact import ArtifactRepo
 from app.repos.audit import AuditRepo
@@ -45,6 +46,15 @@ class ArtifactService:
                 raise ForbiddenError("human lacks read access to project")
             return
         raise ForbiddenError("principal lacks read access to project")
+
+    async def _assert_human_write_scope(
+        self, human: HumanUser, project_pk: int
+    ) -> None:
+        scope = await self.project_repo.get_human_scope_by_pk(
+            human.id, project_pk
+        )
+        if scope is None or scope.role not in WRITE_ROLES:
+            raise ForbiddenError("human lacks write access to project")
 
     async def _resolve_artifact(self, artifact_id: str) -> Artifact:
         artifact = await self.artifact_repo.get_artifact_by_artifact_id(artifact_id)
@@ -396,3 +406,24 @@ class ArtifactService:
             }
             for a in results
         ]
+
+    async def change_visibility(
+        self,
+        human: HumanUser,
+        artifact_id: str,
+        visibility: str,
+    ) -> dict:
+        artifact = await self._resolve_artifact(artifact_id)
+        await self._assert_human_write_scope(human, artifact.project_id)
+        await self.artifact_repo.update_visibility(artifact.id, visibility)
+        await self.audit_repo.write_audit_log(
+            event="visibility_change",
+            actor_human_id=human.id,
+            target_artifact_id=artifact.id,
+            payload={"visibility": visibility},
+        )
+        await self.session.commit()
+        return {
+            "artifact_id": artifact.artifact_id,
+            "visibility": visibility,
+        }

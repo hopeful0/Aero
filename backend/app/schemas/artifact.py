@@ -40,6 +40,10 @@ class ForkRequest(BaseModel):
     from_version: int | None = None
 
 
+class VisibilityUpdateRequest(BaseModel):
+    visibility: Literal["private", "public"]
+
+
 class ArtifactResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

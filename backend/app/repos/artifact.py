@@ -156,6 +156,17 @@ class ArtifactRepo(BaseRepo):
         result = await self.session.execute(stmt)
         return result.rowcount
 
+    async def update_visibility(
+        self, artifact_pk: int, visibility: str
+    ) -> bool:
+        stmt = (
+            update(Artifact)
+            .where(Artifact.id == artifact_pk)
+            .values(visibility=visibility, updated_at=func.now())
+        )
+        result = await self.session.execute(stmt)
+        return result.rowcount > 0
+
     async def insert_fork_lineage(
         self,
         child_artifact_pk: int,
