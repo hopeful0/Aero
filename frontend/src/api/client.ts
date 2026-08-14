@@ -73,6 +73,9 @@ export const http = {
   put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     return apiClient.put(url, data, config) as unknown as Promise<T>
   },
+  patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    return apiClient.patch(url, data, config) as unknown as Promise<T>
+  },
   delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
     return apiClient.delete(url, config) as unknown as Promise<T>
   },

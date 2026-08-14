@@ -29,6 +29,7 @@ export interface Artifact {
   changelog: string | null
   created_at: string
   updated_at: string | null
+  visibility: 'private' | 'public'
   context?: ContextSnapshot | null
   feedback?: Feedback[]
 }
@@ -41,6 +42,7 @@ export interface ArtifactListItem {
   artifact_type: string | null
   tags: string[]
   updated_at: string
+  visibility: 'private' | 'public'
 }
 
 export interface ArtifactVersion {
@@ -55,6 +57,7 @@ export interface ArtifactVersion {
 export interface PublishResult {
   artifact_id: string
   version: number
+  visibility: 'private' | 'public'
   web_url: string
 }
 

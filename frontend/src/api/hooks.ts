@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { http } from './client'
+import { useAuthStore } from '@/store/auth'
 import type {
   AgentCreateResult,
   Artifact,
@@ -58,25 +59,29 @@ export function useVersions(id: string | undefined) {
 }
 
 export function useLineage(id: string | undefined) {
+  const human = useAuthStore((s) => s.human)
   return useQuery<LineageNode[]>({
     queryKey: qk.lineage(id ?? ''),
     queryFn: () => http.get<LineageNode[]>(`/artifacts/${id}/lineage`),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && !!human,
   })
 }
 
 export function useFeedback(id: string | undefined) {
+  const human = useAuthStore((s) => s.human)
   return useQuery<Feedback[]>({
     queryKey: qk.feedback(id ?? ''),
     queryFn: () => http.get<Feedback[]>(`/artifacts/${id}/feedback`),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && !!human,
   })
 }
 
 export function useProjects() {
+  const human = useAuthStore((s) => s.human)
   return useQuery<Project[]>({
     queryKey: qk.projects(),
     queryFn: () => http.get<Project[]>('/projects'),
+    enabled: !!human,
   })
 }
 
@@ -209,6 +214,25 @@ export function useCreateFeedback(id: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.feedback(id) })
       void qc.invalidateQueries({ queryKey: qk.artifact(id) })
+    },
+  })
+}
+
+export function useToggleVisibility(id: string) {
+  const qc = useQueryClient()
+  return useMutation<
+    { visibility: 'private' | 'public' },
+    Error,
+    { visibility: 'private' | 'public' }
+  >({
+    mutationFn: (input) =>
+      http.patch<{ visibility: 'private' | 'public' }>(
+        `/artifacts/${id}`,
+        input,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['artifact', id] })
+      void qc.invalidateQueries({ queryKey: ['artifacts'] })
     },
   })
 }

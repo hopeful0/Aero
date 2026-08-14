@@ -1,11 +1,14 @@
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { useArtifactList, useProjects } from '@/api/hooks'
+import { useAuthStore } from '@/store/auth'
+import VisibilityBadge from '@/components/artifact/VisibilityBadge'
 import type { ArtifactListItem } from '@/api/types'
 
 const ARTIFACT_TYPES = ['', 'markdown', 'code', 'json_schema', 'html']
 
 export default function Square() {
   const [params, setParams] = useSearchParams()
+  const human = useAuthStore((s) => s.human)
   const projectId = params.get('project_id') ?? undefined
   const tagsParam = params.get('tags') ?? ''
   const tags = tagsParam ? tagsParam.split(',').map((t) => t.trim()).filter(Boolean) : undefined
@@ -30,8 +33,8 @@ export default function Square() {
     setParams(next, { replace: true })
   }
 
-  if (projectsLoading) return <p className="muted">加载中…</p>
-  if (projects && projects.length === 0)
+  if (human && projectsLoading) return <p className="muted">加载中…</p>
+  if (human && projects && projects.length === 0)
     return <Navigate to="/onboarding" replace />
 
   const hasFilters = Boolean(projectId || tagsParam || type || creator)
@@ -42,25 +45,40 @@ export default function Square() {
       <div className="square__head">
         <h1>产物广场</h1>
         <p className="square__sub">
-          按项目 / 标签 / 类型 / 创建者过滤，点击卡片进入评审。
+          {human
+            ? '按项目 / 标签 / 类型 / 创建者过滤，点击卡片进入评审。'
+            : '浏览所有公开产物（无需登录）。'}
         </p>
       </div>
 
+      {!human ? (
+        <div className="square__anon-cta">
+          <p className="muted">
+            浏览公开产物。登录后可看血统、反馈、私有产物。
+          </p>
+          <Link className="btn btn--primary" to="/login" state={{ from: '/' }}>
+            登录
+          </Link>
+        </div>
+      ) : null}
+
       <form className="square__filters" onSubmit={(e) => e.preventDefault()}>
-        <label className="field">
-          <span>项目</span>
-          <select
-            value={projectId ?? ''}
-            onChange={(e) => update('project_id', e.target.value)}
-          >
-            <option value="">全部</option>
-            {projects?.map((p) => (
-              <option key={p.project_id} value={p.project_id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {human ? (
+          <label className="field">
+            <span>项目</span>
+            <select
+              value={projectId ?? ''}
+              onChange={(e) => update('project_id', e.target.value)}
+            >
+              <option value="">全部</option>
+              {projects?.map((p) => (
+                <option key={p.project_id} value={p.project_id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <label className="field">
           <span>标签（逗号分隔）</span>
           <input
@@ -122,6 +140,7 @@ export default function Square() {
                       {t}
                     </span>
                   ))}
+                  <VisibilityBadge visibility={item.visibility} />
                 </div>
                 <time className="card__time">
                   {new Date(item.updated_at).toLocaleString()}
@@ -132,7 +151,7 @@ export default function Square() {
         </ul>
       ) : hasFilters ? (
         <p className="muted">暂无产物，调整过滤条件或等待 Agent 发布。</p>
-      ) : hasProjects ? (
+      ) : human && hasProjects ? (
         <div className="square__empty">
           <p className="muted">
             这个项目还没有产物。创建一个 Agent，让它通过 API 发布第一份产物。
@@ -141,11 +160,18 @@ export default function Square() {
             去引导页新建 Agent
           </Link>
         </div>
-      ) : (
+      ) : human ? (
         <div className="square__empty">
           <p className="muted">还没有项目，去创建第一个 Project 与 Agent。</p>
           <Link className="btn btn--primary" to="/onboarding">
             去引导页
+          </Link>
+        </div>
+      ) : (
+        <div className="square__empty">
+          <p className="muted">暂无公开产物。</p>
+          <Link className="btn btn--primary" to="/login" state={{ from: '/' }}>
+            登录
           </Link>
         </div>
       )}

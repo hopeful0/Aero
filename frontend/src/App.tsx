@@ -13,14 +13,19 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/health" element={<Health />} />
+
+      <Route element={<Layout />}>
+        <Route path="/" element={<Square />} />
+        <Route path="/artifacts/:artifactId" element={<ArtifactView />} />
+      </Route>
+
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
-          <Route path="/" element={<Square />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/projects/:projectId" element={<ProjectView />} />
-          <Route path="/artifacts/:artifactId" element={<ArtifactView />} />
         </Route>
       </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

@@ -1,14 +1,23 @@
-import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { useArtifact, useFeedback, useCreateFeedback } from '@/api/hooks'
+import { useAuthStore } from '@/store/auth'
+import { ApiError } from '@/api/client'
 import MarkdownRender from '@/components/render/MarkdownRender'
 import LineageDrawer from '@/components/lineage/LineageDrawer'
+import VisibilityBadge from '@/components/artifact/VisibilityBadge'
+import ShareControl from '@/components/artifact/ShareControl'
+import AnonymousCta from '@/components/artifact/AnonymousCta'
 import type { FeedbackKind } from '@/api/types'
 
 export default function ArtifactView() {
   const { artifactId } = useParams()
+  const human = useAuthStore((s) => s.human)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [comment, setComment] = useState('')
+  const [localVisibility, setLocalVisibility] = useState<'private' | 'public'>(
+    'private',
+  )
 
   const {
     data: artifact,
@@ -18,12 +27,31 @@ export default function ArtifactView() {
   const { data: feedbackList } = useFeedback(artifactId)
   const feedbackMut = useCreateFeedback(artifactId ?? '')
 
+  useEffect(() => {
+    if (artifact) setLocalVisibility(artifact.visibility)
+  }, [artifact])
+
   if (!artifactId) {
     return <p className="muted">缺少产物 ID</p>
   }
   if (isLoading) return <p className="muted">加载中…</p>
   if (error) {
-    return (
+    const is404 = error instanceof ApiError && error.status === 404
+    return is404 ? (
+      <div className="artifact__notfound" role="alert">
+        <h1>未找到产物</h1>
+        <p className="muted">
+          该产物可能不存在或未公开。登录后查看你权限范围内的产物。
+        </p>
+        <Link
+          className="btn btn--primary"
+          to="/login"
+          state={{ from: `/artifacts/${artifactId}` }}
+        >
+          登录
+        </Link>
+      </div>
+    ) : (
       <p className="error">
         {error instanceof Error ? error.message : '加载失败'}
       </p>
@@ -79,15 +107,30 @@ export default function ArtifactView() {
             <time className="meta-label">
               {new Date(artifact.created_at).toLocaleString()}
             </time>
+            <VisibilityBadge
+              visibility={localVisibility}
+              showPrivate={Boolean(human)}
+            />
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn--ghost"
-          onClick={() => setDrawerOpen(true)}
-        >
-          血统
-        </button>
+        <div className="artifact__actions">
+          {human ? (
+            <ShareControl
+              artifactId={artifactId}
+              visibility={localVisibility}
+              onUpdated={setLocalVisibility}
+            />
+          ) : null}
+          {human ? (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setDrawerOpen(true)}
+            >
+              血统
+            </button>
+          ) : null}
+        </div>
       </header>
 
       <div className="artifact__body">
@@ -128,77 +171,83 @@ export default function ArtifactView() {
         </details>
       ) : null}
 
-      <section className="feedback">
-        <h3 className="feedback__heading">反馈</h3>
-        <div className="feedback__bar">
-          <button
-            type="button"
-            className="btn btn--up"
-            onClick={() => onVote('thumbs_up')}
-            disabled={feedbackMut.isPending}
-          >
-            👍 Useful
-          </button>
-          <button
-            type="button"
-            className="btn btn--down"
-            onClick={() => onVote('thumbs_down')}
-            disabled={feedbackMut.isPending}
-          >
-            👎 Needs Revision
-          </button>
-        </div>
-        <form className="feedback__form" onSubmit={onComment}>
-          <textarea
-            className="feedback__textarea"
-            placeholder="整体评论…"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            rows={3}
-          />
-          <button
-            type="submit"
-            className="btn btn--primary"
-            disabled={feedbackMut.isPending || !comment.trim()}
-          >
-            提交评论
-          </button>
-        </form>
-        {feedbackMut.error ? (
-          <p className="error">
-            {feedbackMut.error instanceof Error
-              ? feedbackMut.error.message
-              : '提交失败'}
-          </p>
-        ) : null}
+      {human ? (
+        <section className="feedback">
+          <h3 className="feedback__heading">反馈</h3>
+          <div className="feedback__bar">
+            <button
+              type="button"
+              className="btn btn--up"
+              onClick={() => onVote('thumbs_up')}
+              disabled={feedbackMut.isPending}
+            >
+              👍 Useful
+            </button>
+            <button
+              type="button"
+              className="btn btn--down"
+              onClick={() => onVote('thumbs_down')}
+              disabled={feedbackMut.isPending}
+            >
+              👎 Needs Revision
+            </button>
+          </div>
+          <form className="feedback__form" onSubmit={onComment}>
+            <textarea
+              className="feedback__textarea"
+              placeholder="整体评论…"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={3}
+            />
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={feedbackMut.isPending || !comment.trim()}
+            >
+              提交评论
+            </button>
+          </form>
+          {feedbackMut.error ? (
+            <p className="error">
+              {feedbackMut.error instanceof Error
+                ? feedbackMut.error.message
+                : '提交失败'}
+            </p>
+          ) : null}
 
-        <h4 className="feedback__subhead">已有反馈</h4>
-        {feedbacks.length > 0 ? (
-          <ul className="feedback__list">
-            {feedbacks.map((fb) => (
-              <li key={fb.id} className="feedback__item">
-                <span className={`chip chip--fb chip--fb-${fb.kind}`}>
-                  {fb.kind}
-                </span>
-                <span className="meta-label">v{fb.version_no}</span>
-                {fb.body ? <p className="feedback__body">{fb.body}</p> : null}
-                <time className="meta-label">
-                  {new Date(fb.created_at).toLocaleString()}
-                </time>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">暂无反馈</p>
-        )}
-      </section>
+          <h4 className="feedback__subhead">已有反馈</h4>
+          {feedbacks.length > 0 ? (
+            <ul className="feedback__list">
+              {feedbacks.map((fb) => (
+                <li key={fb.id} className="feedback__item">
+                  <span className={`chip chip--fb chip--fb-${fb.kind}`}>
+                    {fb.kind}
+                  </span>
+                  <span className="meta-label">v{fb.version_no}</span>
+                  {fb.body ? <p className="feedback__body">{fb.body}</p> : null}
+                  <time className="meta-label">
+                    {new Date(fb.created_at).toLocaleString()}
+                  </time>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted">暂无反馈</p>
+          )}
+        </section>
+      ) : (
+        <AnonymousCta next={`/artifacts/${artifactId}`} />
+      )}
 
-      <LineageDrawer
-        artifactId={artifactId}
-        creatorAgentId={artifact.creator_agent_id}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-      />
+      {human ? (
+        <LineageDrawer
+          artifactId={artifactId}
+          creatorAgentId={artifact.creator_agent_id}
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+        />
+      ) : null}
     </section>
   )
 }

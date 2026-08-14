@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useLogin, useRegisterHuman } from '@/api/hooks'
 import { useAuthStore } from '@/store/auth'
 import { ApiError } from '@/api/client'
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const setHuman = useAuthStore((s) => s.setHuman)
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [name, setName] = useState('')
@@ -28,7 +29,9 @@ export default function Login() {
         const res = await loginMut.mutateAsync({ email, password })
         setHuman({ humanId: res.human_id, name: res.name ?? email })
       }
-      navigate('/')
+      const next =
+        (location.state as { from?: string } | null)?.from ?? '/'
+      navigate(next, { replace: true })
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message)
