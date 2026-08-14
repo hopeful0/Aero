@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.api.v1.admin import router as admin_router
 from app.api.v1.artifacts import router as artifacts_router
@@ -10,6 +10,7 @@ from app.api.v1.feedback import router as feedback_router
 from app.api.v1.lineage import router as lineage_router
 from app.core.config import settings
 from app.core.errors import AeroError
+from app.skills import SKILL_MD
 
 
 def error_body(code: str, message: str, details: dict | None = None) -> dict:
@@ -83,3 +84,8 @@ async def healthz() -> dict[str, str]:
 @app.get("/readyz")
 async def readyz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/skill")
+async def get_skill() -> Response:
+    return Response(content=SKILL_MD, media_type="text/markdown")
