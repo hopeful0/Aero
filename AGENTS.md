@@ -1,6 +1,6 @@
 # AGENTS.md — 给 opencode 子 agent 与开发者的工作指南
 
-本项目文档（PRD-v2.md / TECH-DESIGN.md）是需求与设计的唯一事实来源。实现前务必阅读相关章节。
+需求与设计文档是唯一事实来源，由 `project-lead` 子代理维护为本地工作文件（不纳入 VCS），不在此仓库内；实现前向其索取相关章节。
 
 ## 必跑命令（提交前）
 
@@ -18,7 +18,7 @@ npm run typecheck
 
 未跑 lint/typecheck 的改动不得提交。若命令缺失，先问用户或写入此处。
 
-## 架构约束（见 TECH-DESIGN）
+## 架构约束
 
 - 分层：API (`app/api/`) → Service (`app/services/`) → Repo (`app/repos/`) → Models (`app/models/`)。
 - 统一响应包装：成功 `{"data": ...}`；失败 `{"error": {"code": "...", "message": "...", "details": {...}}}`，靠 HTTP status 码表达，body 不放 `code` 字段。

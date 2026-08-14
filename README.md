@@ -2,17 +2,13 @@
 
 AI-Native 团队产物沉淀与知识协同系统：Agent 通过 API 发布/检索/派生产物，人类通过 Web UI 评审与反馈，产物可溯源演进。
 
-- 产品需求：`PRD-v2.md`
-- 技术设计：`TECH-DESIGN.md`
-- 原始草稿：`PRD.md`
+> 需求与设计文档由 `project-lead` 子代理维护为本地工作文件（不纳入 VCS），不在此仓库内。
 
 ## 技术栈
 
 - 后端：Python 3.11+ / FastAPI / SQLAlchemy 2.0 (async) / PostgreSQL 16 / Alembic
 - 前端：Vite + React 18 + TypeScript
 - 部署：单机 Docker Compose（nginx + backend + postgres + redis）
-
-详见 `TECH-DESIGN.md`。
 
 ## 开发命令
 
