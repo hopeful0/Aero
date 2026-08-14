@@ -1,0 +1,18 @@
+# 用法: docker compose -f docker-compose.yml -f docker-compose.dev.yml up postgres redis backend
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  backend:
+    ports:
+      - "8000:8000"
+    environment:
+      AERO_ENV: dev
+
+  nginx:
+    profiles: ["never"]

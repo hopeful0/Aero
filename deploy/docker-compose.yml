@@ -2,25 +2,27 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: aero
-      POSTGRES_PASSWORD: aero
-      POSTGRES_DB: aero
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${AERO_PG_USER:-aero}
+      POSTGRES_PASSWORD: ${AERO_PG_PASSWORD:-aero}
+      POSTGRES_DB: ${AERO_PG_DB:-aero}
+    expose:
+      - "5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks: [aero-net]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aero"]
+      test: ["CMD-SHELL", "pg_isready -U ${AERO_PG_USER:-aero}"]
       interval: 5s
       timeout: 3s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
     volumes:
       - redisdata:/data
+    networks: [aero-net]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -30,18 +32,40 @@ services:
   backend:
     build:
       context: ../backend
-    env_file: ../backend/.env
     environment:
-      AERO_ENV: dev
-      AERO_POSTGRES_DSN: postgresql+asyncpg://aero:aero@postgres:5432/aero
+      AERO_ENV: ${AERO_ENV:-prod}
+      AERO_POSTGRES_DSN: postgresql+asyncpg://${AERO_PG_USER:-aero}:${AERO_PG_PASSWORD:-aero}@postgres:5432/${AERO_PG_DB:-aero}
       AERO_REDIS_URL: redis://redis:6379/0
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
+    networks: [aero-net]
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/readyz').status==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  nginx:
+    build:
+      context: ..
+      dockerfile: deploy/nginx/Dockerfile
+    ports:
+      - "${AERO_HTTP_PORT:-80}:80"
+    networks: [aero-net]
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  aero-net:
+    driver: bridge
 
 volumes:
   pgdata:
