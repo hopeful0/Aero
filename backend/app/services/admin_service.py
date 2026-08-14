@@ -55,6 +55,17 @@ class AdminService:
     async def list_projects(self, human: HumanUser) -> list[Project]:
         return await self.project_repo.list_projects_for_human(human.id)
 
+    async def get_agent_self(self, agent: Agent) -> dict:
+        owner = await self.human_repo.get_by_id(agent.owner_human_id)
+        scopes = await self.agent_repo.list_agent_scopes(agent.id)
+        return {
+            "agent_id": agent.agent_id,
+            "name": agent.name,
+            "owner_human_id": owner.human_id if owner is not None else None,
+            "is_active": agent.is_active,
+            "projects": scopes,
+        }
+
     async def create_agent(
         self,
         actor: HumanUser,

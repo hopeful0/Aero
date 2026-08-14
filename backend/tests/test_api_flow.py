@@ -227,6 +227,65 @@ async def test_full_api_flow(client):
 
 
 @pytest.mark.asyncio
+async def test_agent_self_introspection(client):
+    human_email = "carol@example.com"
+
+    resp = await client.post(
+        f"{BASE}/humans",
+        json={"name": "carol", "email": human_email, "password": "s3cret-pass"},
+    )
+    assert resp.status_code == 201
+    human_id = resp.json()["data"]["human_id"]
+
+    resp = await client.post(
+        f"{BASE}/auth/login",
+        json={"email": human_email, "password": "s3cret-pass"},
+    )
+    assert resp.status_code == 200
+
+    resp = await client.post(f"{BASE}/projects", json={"name": "introspect-proj"})
+    assert resp.status_code == 201
+    project_id = resp.json()["data"]["project_id"]
+
+    resp = await client.post(
+        f"{BASE}/agents",
+        json={
+            "name": "self-aware-agent",
+            "owner_human_id": human_id,
+            "project_id": project_id,
+            "role": "both",
+        },
+    )
+    assert resp.status_code == 201
+    agent_data = resp.json()["data"]
+    agent_id = agent_data["agent_id"]
+    token = agent_data["token"]
+
+    resp = await client.get(
+        f"{BASE}/agents/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["agent_id"] == agent_id
+    assert data["name"] == "self-aware-agent"
+    assert data["owner_human_id"] == human_id
+    assert data["is_active"] is True
+    assert len(data["projects"]) == 1
+    scope = data["projects"][0]
+    assert scope["project_id"] == project_id
+    assert scope["name"] == "introspect-proj"
+    assert scope["role"] == "both"
+
+    resp = await client.get(
+        f"{BASE}/agents/me",
+        headers={"Authorization": "Bearer bad-token"},
+    )
+    assert resp.status_code == 401
+    assert resp.json()["error"]["code"] == "UNAUTHORIZED"
+
+
+@pytest.mark.asyncio
 async def test_auth_failures(client):
     resp = await client.post(
         f"{BASE}/humans",

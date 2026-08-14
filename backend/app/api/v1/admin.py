@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.deps import AdminSvc, CurrentHuman
+from app.api.deps import AdminSvc, CurrentAgent, CurrentHuman
 from app.core.response import ok
 from app.schemas.auth import AgentCreateRequest, HumanRegisterRequest
 from app.schemas.project import ProjectCreateRequest
@@ -58,3 +58,8 @@ async def create_agent(
             "token": token,
         }
     )
+
+
+@router.get("/agents/me")
+async def get_agent_self(agent: CurrentAgent, admin_service: AdminSvc):
+    return ok(await admin_service.get_agent_self(agent))

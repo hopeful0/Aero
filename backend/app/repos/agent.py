@@ -69,6 +69,18 @@ class AgentRepo(BaseRepo):
         await self.session.flush()
         return scope
 
+    async def list_agent_scopes(self, agent_pk: int) -> list[dict]:
+        stmt = (
+            select(Project.project_id, Project.name, AgentProjectScope.role)
+            .join(AgentProjectScope, AgentProjectScope.project_id == Project.id)
+            .where(AgentProjectScope.agent_id == agent_pk)
+        )
+        result = await self.session.execute(stmt)
+        return [
+            {"project_id": row.project_id, "name": row.name, "role": row.role}
+            for row in result.all()
+        ]
+
     async def list_agent_project_pks(self, agent_pk: int) -> list[int]:
         result = await self.session.execute(
             select(AgentProjectScope.project_id).where(
