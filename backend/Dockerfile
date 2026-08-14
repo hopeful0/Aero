@@ -8,7 +8,7 @@ COPY pyproject.toml ./
 RUN uv sync --no-dev --no-install-project
 
 COPY . .
-RUN uv sync --no-dev
+RUN uv sync --no-dev --frozen
 
 EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
