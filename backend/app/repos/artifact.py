@@ -1,4 +1,4 @@
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 
 from app.models.agent import Agent
 from app.models.artifact import (
@@ -23,6 +23,7 @@ class ArtifactRepo(BaseRepo):
         creator_agent_pk: int,
         owner_human_pk: int,
         content_storage: str = "inline",
+        visibility: str = "private",
     ) -> Artifact:
         artifact = Artifact(
             project_id=project_pk,
@@ -34,6 +35,7 @@ class ArtifactRepo(BaseRepo):
             owner_human_id=owner_human_pk,
             current_version=1,
             content_storage=content_storage,
+            visibility=visibility,
         )
         self.session.add(artifact)
         await self.session.flush()
@@ -52,15 +54,30 @@ class ArtifactRepo(BaseRepo):
         return result.scalar_one_or_none()
 
     async def list_artifacts(
-        self, filters: SearchParams, project_pks: list[int] | None = None
+        self,
+        filters: SearchParams,
+        project_pks: list[int] | None = None,
+        *,
+        public_only: bool = False,
+        include_public: bool = False,
     ) -> list[Artifact]:
         stmt = select(Artifact).where(Artifact.archived_at.is_(None))
+        if public_only:
+            stmt = stmt.where(Artifact.visibility == "public")
         if filters.project_id is not None:
             stmt = stmt.join(Project, Artifact.project_id == Project.id).where(
                 Project.project_id == filters.project_id
             )
         elif project_pks is not None:
-            stmt = stmt.where(Artifact.project_id.in_(project_pks))
+            if include_public:
+                stmt = stmt.where(
+                    or_(
+                        Artifact.project_id.in_(project_pks),
+                        Artifact.visibility == "public",
+                    )
+                )
+            else:
+                stmt = stmt.where(Artifact.project_id.in_(project_pks))
         if filters.tags:
             stmt = stmt.where(Artifact.tags.op("&&")(filters.tags))
         if filters.type is not None:

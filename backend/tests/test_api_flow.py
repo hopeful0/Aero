@@ -310,4 +310,220 @@ async def test_auth_failures(client):
         f"{BASE}/artifacts/some-id",
         headers={"Authorization": "Bearer bad-token"},
     )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_visibility(client):
+    resp = await client.post(
+        f"{BASE}/humans",
+        json={"name": "vis-user", "email": "vis@example.com", "password": "s3cret-pass"},
+    )
+    assert resp.status_code == 201
+    human_id = resp.json()["data"]["human_id"]
+
+    resp = await client.post(
+        f"{BASE}/auth/login",
+        json={"email": "vis@example.com", "password": "s3cret-pass"},
+    )
+    assert resp.status_code == 200
+
+    resp = await client.post(f"{BASE}/projects", json={"name": "vis-proj-a"})
+    assert resp.status_code == 201
+    project_a_id = resp.json()["data"]["project_id"]
+
+    resp = await client.post(f"{BASE}/projects", json={"name": "vis-proj-b"})
+    assert resp.status_code == 201
+    project_b_id = resp.json()["data"]["project_id"]
+
+    resp = await client.post(
+        f"{BASE}/agents",
+        json={
+            "name": "vis-agent-a",
+            "owner_human_id": human_id,
+            "project_id": project_a_id,
+            "role": "both",
+        },
+    )
+    assert resp.status_code == 201
+    agent_a_headers = {"Authorization": f"Bearer {resp.json()['data']['token']}"}
+
+    resp = await client.post(
+        f"{BASE}/agents",
+        json={
+            "name": "vis-agent-b",
+            "owner_human_id": human_id,
+            "project_id": project_b_id,
+            "role": "both",
+        },
+    )
+    assert resp.status_code == 201
+    agent_b_headers = {"Authorization": f"Bearer {resp.json()['data']['token']}"}
+
+    resp = await client.post(
+        f"{BASE}/artifacts",
+        json={
+            "project_id": project_a_id,
+            "title": "Public Doc",
+            "artifact_type": "markdown",
+            "content": "# Public",
+            "tags": ["public-tag"],
+            "context": {
+                "prompt_snapshot": "public prompt",
+                "external_refs": {"task_id": "T-pub"},
+            },
+            "visibility": "public",
+        },
+        headers=agent_a_headers,
+    )
+    assert resp.status_code == 201
+    public_art_id = resp.json()["data"]["artifact_id"]
+    assert resp.json()["data"]["visibility"] == "public"
+
+    resp = await client.post(
+        f"{BASE}/artifacts",
+        json={
+            "project_id": project_a_id,
+            "title": "Private Doc",
+            "artifact_type": "markdown",
+            "content": "# Private",
+            "visibility": "private",
+        },
+        headers=agent_a_headers,
+    )
+    assert resp.status_code == 201
+    private_art_id = resp.json()["data"]["artifact_id"]
+    assert resp.json()["data"]["visibility"] == "private"
+
+    resp = await client.post(
+        f"{BASE}/artifacts",
+        json={
+            "project_id": project_a_id,
+            "title": "Default Doc",
+            "artifact_type": "markdown",
+            "content": "# Default",
+        },
+        headers=agent_a_headers,
+    )
+    assert resp.status_code == 201
+    default_art_id = resp.json()["data"]["artifact_id"]
+    assert resp.json()["data"]["visibility"] == "private"
+
+    resp = await client.post(
+        f"{BASE}/artifacts",
+        json={
+            "project_id": project_a_id,
+            "title": "Bad Vis",
+            "artifact_type": "markdown",
+            "content": "# bad",
+            "visibility": "org",
+        },
+        headers=agent_a_headers,
+    )
+    assert resp.status_code == 422
+
+    client.cookies.clear()
+
+    resp = await client.get(f"{BASE}/artifacts")
+    assert resp.status_code == 200
+    items = resp.json()["data"]
+    art_ids = {i["artifact_id"] for i in items}
+    assert public_art_id in art_ids
+    assert private_art_id not in art_ids
+    assert default_art_id not in art_ids
+    assert all(i["visibility"] == "public" for i in items)
+
+    resp = await client.get(
+        f"{BASE}/artifacts/{public_art_id}",
+        params={"include_context": True, "include_feedback": True},
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["artifact_id"] == public_art_id
+    assert data["content"] == "# Public"
+    assert data["visibility"] == "public"
+    assert data["context"] is not None
+    assert data["context"]["prompt_snapshot"] == "public prompt"
+    assert "feedback" not in data
+
+    resp = await client.get(f"{BASE}/artifacts/{private_art_id}")
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "NOT_FOUND"
+
+    resp = await client.get(f"{BASE}/artifacts/{private_art_id}/versions")
+    assert resp.status_code == 404
+
+    resp = await client.get(f"{BASE}/artifacts/{public_art_id}/versions")
+    assert resp.status_code == 200
+    versions = resp.json()["data"]
+    assert len(versions) == 1
+    assert versions[0]["version_no"] == 1
+
+    resp = await client.get(f"{BASE}/artifacts/{public_art_id}/lineage")
     assert resp.status_code == 401
+
+    resp = await client.get(f"{BASE}/artifacts/{public_art_id}/feedback")
+    assert resp.status_code == 401
+
+    resp = await client.post(
+        f"{BASE}/artifacts",
+        json={
+            "project_id": project_a_id,
+            "title": "Anon Attempt",
+            "content": "# anon",
+        },
+    )
+    assert resp.status_code == 401
+
+    resp = await client.post(
+        f"{BASE}/artifacts/{public_art_id}/fork",
+        json={"new_title": "Anon Fork"},
+    )
+    assert resp.status_code == 401
+
+    resp = await client.get(f"{BASE}/artifacts", headers=agent_a_headers)
+    assert resp.status_code == 200
+    items = resp.json()["data"]
+    art_ids = {i["artifact_id"] for i in items}
+    assert public_art_id in art_ids
+    assert private_art_id in art_ids
+    assert default_art_id in art_ids
+
+    resp = await client.get(
+        f"{BASE}/artifacts/{public_art_id}",
+        headers=agent_b_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["artifact_id"] == public_art_id
+
+    resp = await client.get(
+        f"{BASE}/artifacts/{private_art_id}",
+        headers=agent_b_headers,
+    )
+    assert resp.status_code == 403
+
+    resp = await client.get(f"{BASE}/artifacts", headers=agent_b_headers)
+    assert resp.status_code == 200
+    items = resp.json()["data"]
+    art_ids = {i["artifact_id"] for i in items}
+    assert public_art_id in art_ids
+    assert private_art_id not in art_ids
+
+    resp = await client.post(
+        f"{BASE}/artifacts/{public_art_id}/fork",
+        json={"new_title": "Forked Public"},
+        headers=agent_a_headers,
+    )
+    assert resp.status_code == 201
+    forked_id = resp.json()["data"]["artifact_id"]
+
+    resp = await client.get(
+        f"{BASE}/artifacts/{forked_id}",
+        headers=agent_a_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["visibility"] == "private"
+
+    client.cookies.clear()
+    resp = await client.get(f"{BASE}/artifacts/{forked_id}")
+    assert resp.status_code == 404

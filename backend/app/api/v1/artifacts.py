@@ -2,7 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Query
 
-from app.api.deps import ArtifactSvc, CurrentAgent, CurrentPrincipal
+from app.api.deps import ArtifactSvc, CurrentAgent, OptionalPrincipal
 from app.core.response import ok
 from app.schemas.artifact import ForkRequest, NewVersionRequest, PublishRequest, SearchParams
 
@@ -26,13 +26,14 @@ async def publish(body: PublishRequest, agent: CurrentAgent, service: ArtifactSv
         content=body.content,
         tags=body.tags,
         context=_parse_context(body),
+        visibility=body.visibility,
     )
     return ok(result)
 
 
 @router.get("/artifacts")
 async def search(
-    principal: CurrentPrincipal,
+    principal: OptionalPrincipal,
     service: ArtifactSvc,
     project_id: str | None = Query(default=None),
     tags: list[str] = Query(default=[]),
@@ -60,7 +61,7 @@ async def search(
 @router.get("/artifacts/{artifact_id}")
 async def get_artifact(
     artifact_id: str,
-    principal: CurrentPrincipal,
+    principal: OptionalPrincipal,
     service: ArtifactSvc,
     version: int | None = Query(default=None, ge=1),
     include_context: bool = Query(default=False),
@@ -77,7 +78,7 @@ async def get_artifact(
 
 
 @router.get("/artifacts/{artifact_id}/versions")
-async def list_versions(artifact_id: str, principal: CurrentPrincipal, service: ArtifactSvc):
+async def list_versions(artifact_id: str, principal: OptionalPrincipal, service: ArtifactSvc):
     versions = await service.list_versions(principal, artifact_id)
     return ok(versions)
 

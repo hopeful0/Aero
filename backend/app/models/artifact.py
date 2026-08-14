@@ -9,6 +9,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -44,6 +45,11 @@ class Artifact(TimestampMixin, Base):
         Index("ix_artifact_creator_agent_id", "creator_agent_id"),
         Index("ix_artifact_created_at", "created_at"),
         Index("ix_artifact_tags", "tags", postgresql_using="gin"),
+        Index(
+            "ix_artifact_visibility_public",
+            "updated_at",
+            postgresql_where=text("visibility = 'public' AND archived_at IS NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -71,6 +77,9 @@ class Artifact(TimestampMixin, Base):
     )
     content_storage: Mapped[str] = mapped_column(
         Text, nullable=False, default="inline", server_default="inline"
+    )
+    visibility: Mapped[str] = mapped_column(
+        Text, nullable=False, default="private", server_default="private"
     )
     archived_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

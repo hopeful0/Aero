@@ -43,7 +43,7 @@ def get_lineage_service(
 async def get_current_agent(
     session: Annotated[AsyncSession, Depends(get_session)],
     redis: Annotated[aioredis.Redis, Depends(get_redis)],
-    authorization: BearerHeader,
+    authorization: BearerHeader = None,
 ) -> Agent:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise UnauthorizedError("missing bearer token")
@@ -78,9 +78,27 @@ async def get_current_principal(
     return await auth_service.authenticate_principal(token, session_id)
 
 
+async def get_optional_principal(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    redis: Annotated[aioredis.Redis, Depends(get_redis)],
+    request: Request,
+    authorization: BearerHeader = None,
+) -> Principal:
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    session_id = request.cookies.get("aero_session")
+    auth_service = AuthService(session, redis)
+    try:
+        return await auth_service.authenticate_principal(token, session_id)
+    except UnauthorizedError:
+        return Principal(kind="anonymous")
+
+
 CurrentAgent = Annotated[Agent, Depends(get_current_agent)]
 CurrentHuman = Annotated[HumanUser, Depends(get_current_human)]
 CurrentPrincipal = Annotated[Principal, Depends(get_current_principal)]
+OptionalPrincipal = Annotated[Principal, Depends(get_optional_principal)]
 AdminSvc = Annotated[AdminService, Depends(get_admin_service)]
 ArtifactSvc = Annotated[ArtifactService, Depends(get_artifact_service)]
 FeedbackSvc = Annotated[FeedbackService, Depends(get_feedback_service)]

@@ -64,6 +64,7 @@ class ArtifactService:
         content: str,
         tags: list[str],
         context: dict | None,
+        visibility: str = "private",
     ) -> dict:
         project = await self.project_repo.get_by_project_id(project_id)
         if project is None:
@@ -87,6 +88,7 @@ class ArtifactService:
             tags=tags or None,
             creator_agent_pk=agent.id,
             owner_human_pk=agent.owner_human_id,
+            visibility=visibility,
         )
         await self.artifact_repo.insert_version(
             artifact_pk=artifact.id,
@@ -105,12 +107,13 @@ class ArtifactService:
             on_behalf_of_human_id=agent.owner_human_id,
             target_artifact_id=artifact.id,
             target_version_no=1,
-            payload={"title": title, "artifact_type": artifact_type},
+            payload={"title": title, "artifact_type": artifact_type, "visibility": visibility},
         )
         await self.session.commit()
         return {
             "artifact_id": artifact.artifact_id,
             "version": 1,
+            "visibility": artifact.visibility,
             "web_url": f"/artifacts/{artifact.artifact_id}",
         }
 
@@ -123,7 +126,13 @@ class ArtifactService:
         include_feedback: bool = False,
     ) -> dict:
         artifact = await self._resolve_artifact(artifact_id)
-        await self._assert_principal_read_scope(principal, artifact.project_id)
+        is_anon = principal.kind == "anonymous"
+        if artifact.visibility == "public":
+            pass
+        else:
+            if is_anon:
+                raise NotFoundError("artifact not found", {"artifact_id": artifact_id})
+            await self._assert_principal_read_scope(principal, artifact.project_id)
 
         version_no = version if version is not None else artifact.current_version
         v = await self.artifact_repo.get_version(artifact.id, version_no)
@@ -154,6 +163,7 @@ class ArtifactService:
             "changelog": v.changelog,
             "created_at": v.created_at,
             "updated_at": artifact.updated_at,
+            "visibility": artifact.visibility,
         }
 
         if include_context:
@@ -169,7 +179,7 @@ class ArtifactService:
                         "execution_trace_id": snap.execution_trace_id,
                     }
 
-        if include_feedback:
+        if include_feedback and not is_anon:
             feedbacks = await self.feedback_repo.list_feedback(artifact.id)
             data["feedback"] = [
                 {
@@ -187,7 +197,13 @@ class ArtifactService:
 
     async def list_versions(self, principal: Principal, artifact_id: str) -> list[dict]:
         artifact = await self._resolve_artifact(artifact_id)
-        await self._assert_principal_read_scope(principal, artifact.project_id)
+        is_anon = principal.kind == "anonymous"
+        if artifact.visibility == "public":
+            pass
+        else:
+            if is_anon:
+                raise NotFoundError("artifact not found", {"artifact_id": artifact_id})
+            await self._assert_principal_read_scope(principal, artifact.project_id)
         versions = await self.artifact_repo.get_versions(artifact.id)
         return [
             {
@@ -297,6 +313,7 @@ class ArtifactService:
             tags=parent.tags,
             creator_agent_pk=agent.id,
             owner_human_pk=agent.owner_human_id,
+            visibility="private",
         )
         await self.artifact_repo.insert_version(
             artifact_pk=child.id,
@@ -336,28 +353,36 @@ class ArtifactService:
         }
 
     async def search(self, principal: Principal, params: SearchParams) -> list[dict]:
+        is_anon = principal.kind == "anonymous"
         if params.project_id is not None:
             project = await self.project_repo.get_by_project_id(params.project_id)
             if project is None:
                 raise NotFoundError(
                     "project not found", {"project_id": params.project_id}
                 )
-            await self._assert_principal_read_scope(principal, project.id)
-            results = await self.artifact_repo.list_artifacts(params)
+            if not is_anon:
+                await self._assert_principal_read_scope(principal, project.id)
+            results = await self.artifact_repo.list_artifacts(params, public_only=is_anon)
         else:
-            if principal.kind == "agent" and principal.agent is not None:
-                scoped_pks = await self.agent_repo.list_agent_project_pks(
-                    principal.agent.id
-                )
-            elif principal.kind == "human" and principal.human is not None:
-                scoped_pks = await self.project_repo.list_human_project_pks(
-                    principal.human.id
-                )
+            if is_anon:
+                results = await self.artifact_repo.list_artifacts(params, public_only=True)
             else:
-                scoped_pks = []
-            if not scoped_pks:
-                return []
-            results = await self.artifact_repo.list_artifacts(params, project_pks=scoped_pks)
+                if principal.kind == "agent" and principal.agent is not None:
+                    scoped_pks = await self.agent_repo.list_agent_project_pks(
+                        principal.agent.id
+                    )
+                elif principal.kind == "human" and principal.human is not None:
+                    scoped_pks = await self.project_repo.list_human_project_pks(
+                        principal.human.id
+                    )
+                else:
+                    scoped_pks = []
+                if not scoped_pks:
+                    results = await self.artifact_repo.list_artifacts(params, public_only=True)
+                else:
+                    results = await self.artifact_repo.list_artifacts(
+                        params, project_pks=scoped_pks, include_public=True
+                    )
         return [
             {
                 "artifact_id": a.artifact_id,
@@ -367,6 +392,7 @@ class ArtifactService:
                 "artifact_type": a.artifact_type,
                 "tags": a.tags or [],
                 "updated_at": a.updated_at,
+                "visibility": a.visibility,
             }
             for a in results
         ]

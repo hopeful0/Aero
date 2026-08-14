@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,6 +21,7 @@ class PublishRequest(BaseModel):
     tags: list[str] = Field(default_factory=list)
     parent_artifact_id: str | None = None
     context: ContextSnapshot | None = None
+    visibility: Literal["private", "public"] = "private"
 
 
 class NewVersionRequest(BaseModel):
@@ -55,6 +57,7 @@ class ArtifactResponse(BaseModel):
     context: ContextSnapshot | None = None
     created_at: datetime
     updated_at: datetime | None = None
+    visibility: str = "private"
 
 
 class ArtifactListItem(BaseModel):
@@ -67,6 +70,7 @@ class ArtifactListItem(BaseModel):
     artifact_type: str | None = None
     tags: list[str] = Field(default_factory=list)
     updated_at: datetime
+    visibility: str = "private"
 
 
 class SearchParams(BaseModel):
