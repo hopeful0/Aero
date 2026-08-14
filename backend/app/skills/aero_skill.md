@@ -57,16 +57,18 @@ Create a new artifact at version 1.
   - `tags: string[]` (default `[]`)
   - `parent_artifact_id: string | null`
   - `context: ContextSnapshot | null`
+  - `visibility: "private" | "public"` (default `"private"`)
 - Response `data`:
   - `artifact_id: string`
   - `version: number` (= 1)
+  - `visibility: "private" | "public"`
   - `web_url: string` (relative path `/artifacts/{id}`)
 
 ### GET /api/v1/artifacts — Search
 
 Structured metadata search (M1: no full-text / semantic search).
 
-- Auth: any authenticated principal (agent token or human session).
+- Auth: optional. Anonymous (no header) → only `public` artifacts (cross-project). Authenticated (agent token or human session) → scoped (project scope, incl. `private`) ∪ all `public`.
 - Query params:
   - `project_id: string`
   - `tags: string[]` (repeatable, e.g. `?tags=a&tags=b`)
@@ -84,14 +86,15 @@ Structured metadata search (M1: no full-text / semantic search).
   - `artifact_type: string | null`
   - `tags: string[]`
   - `updated_at: datetime`
+  - `visibility: "private" | "public"`
 
 ### GET /api/v1/artifacts/{artifact_id} — Detail
 
-- Auth: principal with read scope on the artifact's project.
+- Auth: optional. `public` → anyone (anonymous ok) reads the full body + content + context + versions. `private` → principal with read scope; anonymous → `404` (existence hidden).
 - Query params:
   - `version: int` (specific version, default = current)
   - `include_context: boolean` (default false)
-  - `include_feedback: boolean` (default false)
+  - `include_feedback: boolean` (default false; ignored for anonymous — feedback is never returned without auth)
 - Response `data`:
   - `artifact_id: string`
   - `version: number`
@@ -106,12 +109,30 @@ Structured metadata search (M1: no full-text / semantic search).
   - `changelog: string | null`
   - `created_at: datetime`
   - `updated_at: datetime | null`
+  - `visibility: "private" | "public"`
   - `context: ContextSnapshot | null` (only if `include_context=true`)
-  - `feedback: [FeedbackItem]` (only if `include_feedback=true`)
+  - `feedback: [FeedbackItem]` (only if `include_feedback=true` and authenticated)
+
+### PATCH /api/v1/artifacts/{artifact_id} — Change visibility
+
+Toggle an artifact's visibility. This is a **human governance operation** (not an agent write).
+
+- Auth: **human session cookie** (`aero_session`), not an agent bearer token. The human must have write scope (`publisher` or `both`) on the artifact's project.
+- Request JSON:
+  - `visibility: "private" | "public"` (required)
+- Response `data`:
+  - `artifact_id: string`
+  - `visibility: "private" | "public"`
+- Errors:
+  - `401 UNAUTHORIZED` — no / invalid / expired session cookie.
+  - `403 FORBIDDEN` — authenticated human lacks write scope on the project.
+  - `404 NOT_FOUND` — artifact does not exist (or is archived).
+  - `422 VALIDATION_ERROR` — `visibility` missing or not a valid enum value.
+- Audited as `visibility_change` (`actor_human_id`, `target_artifact_id`, `payload={"visibility": ...}`).
 
 ### GET /api/v1/artifacts/{artifact_id}/versions — Version chain
 
-- Auth: principal with read scope.
+- Auth: optional. `public` → anonymous ok. `private` → read scope; anonymous → `404`.
 - Response `data`: array of:
   - `version_no: number`
   - `title: string | null`
@@ -158,7 +179,7 @@ Create a new artifact (version 1) derived from a parent version, recording a lin
 
 Human-submitted reactions on a specific artifact.
 
-- Auth: principal with read scope.
+- Auth: required (agent token or human session); read scope on the artifact's project. Always `401` for anonymous — even on `public` artifacts (feedback exposes reviewer identity / comments).
 - Response `data`: array of:
   - `id: number`
   - `artifact_id: string`
@@ -168,6 +189,30 @@ Human-submitted reactions on a specific artifact.
   - `body: string | null`
   - `inline_anchor: object | null`
   - `created_at: datetime`
+
+## Visibility
+
+Each artifact carries a `visibility` flag controlling read access.
+
+- `private` (default): visible only to principals with read scope on the artifact's project (agent token or human session). Anonymous access returns `404 NOT_FOUND` — existence is not leaked.
+- `public`: **fully anonymous-readable**. Anyone — with no `Authorization` header and no session cookie — may read the artifact body, content, context, and version chain. Aero does not distinguish project scope or introduce org / RBAC for public reads.
+
+Anonymous read surface (`public` artifact):
+
+- `GET /artifacts` (no header) → only `public` artifacts (cross-project, no `private`).
+- `GET /artifacts/{id}` (no header) → full body: metadata + content + changelog + content_format + context (when `include_context=true`) + versions. `include_feedback` is ignored for anonymous (feedback is never returned without auth).
+- `GET /artifacts/{id}/versions` (no header) → version chain.
+
+Authenticated read surface: scoped (principal's project scope, including `private`) ∪ all `public` (cross-project).
+
+Still requires auth (even for `public` artifacts):
+
+- `GET /artifacts/{id}/lineage` — lineage may reference `private` ancestors (title / ID / version counts); anonymous exposure would leak private metadata → `401` without a header.
+- `GET /artifacts/{id}/feedback` — feedback carries `author_human_id` and reviewer comments; anonymous exposure leaks reviewer privacy → `401` without a header.
+
+Write operations (`POST /artifacts`, `POST /artifacts/{id}/versions`, `/fork`, `POST /artifacts/{id}/feedback`, `PATCH /artifacts/{id}`) still require auth + write scope — `public` only relaxes reads, never writes.
+
+> **Security note**: a `public` artifact's `context.prompt_snapshot` (the full generation prompt) and `context.external_refs` (task IDs, trace IDs, commit SHAs) are exposed to the public internet. Before setting `visibility=public`, review the context packet for sensitive material.
 
 ## Story A — End-to-end flow
 
@@ -241,6 +286,45 @@ curl -s -X POST "$BASE/api/v1/artifacts/$ART_ID/versions" \
 
 On `409 VERSION_CONFLICT`, re-fetch the current version and retry with `base_version = current_version`.
 
+### A8 — Share publicly (anonymous read)
+
+Publish a `public` artifact directly, or flip an existing one to public via the human-governed PATCH:
+
+```bash
+# Option A: publish public from the start (agent)
+curl -s -X POST "$BASE/api/v1/artifacts" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"project_id":"proj_...","title":"Public Spec","content":"# Public\n...",
+       "tags":["spec"],"visibility":"public"}'
+```
+
+```bash
+# Option B: flip an existing artifact to public (human, session cookie)
+curl -s -X PATCH "$BASE/api/v1/artifacts/$ART_ID" \
+  -b "aero_session=$HUMAN_SESSION" -H "Content-Type: application/json" \
+  -d '{"visibility":"public"}'
+```
+
+`HUMAN_SESSION` is the `aero_session` cookie obtained from the web login flow (`POST /api/v1/auth/login` with email + password).
+
+Expected `data`: `{"artifact_id":"art_...","visibility":"public"}`.
+
+Verify anonymous (no header, no cookie) can read it:
+
+```bash
+curl -s "$BASE/api/v1/artifacts/$ART_ID"
+```
+
+Expected `data` includes the full body (`content`, `context` with `include_context=true`) and `visibility:"public"`.
+
+Anonymous search returns only public artifacts:
+
+```bash
+curl -s "$BASE/api/v1/artifacts?tags=spec"
+```
+
+Anonymous access to a `private` artifact returns `404 NOT_FOUND` (existence hidden). `lineage` / `feedback` on a `public` artifact still return `401` without auth.
+
 ## Error handling
 
 All failures return:
@@ -252,12 +336,12 @@ All failures return:
 | HTTP | code | meaning |
 |---|---|---|
 | 400 | `BAD_REQUEST` | malformed input / invalid role |
-| 401 | `UNAUTHORIZED` | missing / invalid / revoked token or session |
-| 403 | `FORBIDDEN` | authenticated but lacks project scope / role |
-| 404 | `NOT_FOUND` | artifact / project / version not found |
+| 401 | `UNAUTHORIZED` | missing / invalid / revoked token or session; anonymous call to a forced-auth endpoint (`lineage`, `feedback`, `PATCH /artifacts/{id}`) |
+| 403 | `FORBIDDEN` | authenticated but lacks project scope / role; human without write scope on `PATCH /artifacts/{id}` |
+| 404 | `NOT_FOUND` | artifact / project / version not found; anonymous access to a `private` artifact (existence hidden) |
 | 409 | `CONFLICT` | generic state conflict |
 | 409 | `VERSION_CONFLICT` | optimistic-lock failure; `details.current_version` is the real current version |
-| 422 | `VALIDATION_ERROR` | request schema validation failed; `details.errors` lists field errors |
+| 422 | `VALIDATION_ERROR` | request schema validation failed; `details.errors` lists field errors (e.g. invalid `visibility` value) |
 | 500 | `INTERNAL` | unexpected server error |
 
 ### VERSION_CONFLICT retry
