@@ -2,6 +2,9 @@
 # 阶段 1: 构建前端
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
+# 国内构建可传 --build-arg NPM_REGISTRY=https://registry.npmmirror.com
+ARG NPM_REGISTRY=
+RUN if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY"; fi
 # 先拷依赖清单利用缓存
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci

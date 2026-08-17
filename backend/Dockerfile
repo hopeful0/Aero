@@ -1,8 +1,16 @@
+# uv 镜像默认拉 DockerHub（astral/uv）。国内可通过 --build-arg UV_IMAGE=... 替换为代理镜像
+ARG UV_IMAGE=astral/uv:latest
+FROM ${UV_IMAGE} AS uv
+
 FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=uv /uv /usr/local/bin/uv
+
+# 国内构建可传 --build-arg UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG UV_INDEX_URL=
+ENV UV_INDEX_URL=${UV_INDEX_URL}
 
 COPY pyproject.toml ./
 RUN uv sync --no-dev --no-install-project

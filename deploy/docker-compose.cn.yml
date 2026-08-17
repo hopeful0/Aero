@@ -1,0 +1,19 @@
+# 国内镜像源 overlay
+# 用法: docker compose -f docker-compose.yml -f docker-compose.cn.yml up --build
+#
+# 需要配合 .env.cn 使用:
+#   cp .env.cn .env
+# 或显式指定:
+#   docker compose --env-file .env.cn -f docker-compose.yml -f docker-compose.cn.yml up --build
+
+services:
+  backend:
+    build:
+      args:
+        UV_IMAGE: ${UV_IMAGE:-astral/uv:latest}
+        UV_INDEX_URL: ${UV_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+
+  nginx:
+    build:
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
