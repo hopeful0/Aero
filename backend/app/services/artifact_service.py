@@ -203,6 +203,25 @@ class ArtifactService:
                 for fb in feedbacks
             ]
 
+        if principal.kind == "agent" and principal.agent is not None:
+            await self.audit_repo.write_audit_log(
+                event="fetch",
+                actor_agent_id=principal.agent.id,
+                on_behalf_of_human_id=principal.agent.owner_human_id,
+                target_artifact_id=artifact.id,
+                target_version_no=version_no,
+                payload={"version": version_no, "include_feedback": include_feedback},
+            )
+            await self.session.commit()
+        elif principal.kind == "human" and principal.human is not None:
+            await self.audit_repo.write_audit_log(
+                event="view",
+                actor_human_id=principal.human.id,
+                target_artifact_id=artifact.id,
+                target_version_no=version_no,
+                payload={"version": version_no, "include_feedback": include_feedback},
+            )
+            await self.session.commit()
         return data
 
     async def list_versions(self, principal: Principal, artifact_id: str) -> list[dict]:

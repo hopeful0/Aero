@@ -1,10 +1,16 @@
 import pytest
+from sqlalchemy import select
+
+from app.models.agent import Agent
+from app.models.artifact import Artifact
+from app.models.audit import AuditLog
+from app.models.project import HumanUser
 
 BASE = "http://test/api/v1"
 
 
 @pytest.mark.asyncio
-async def test_full_api_flow(client):
+async def test_full_api_flow(client, session):
     human_email = "alice@example.com"
 
     resp = await client.post(
@@ -157,6 +163,40 @@ async def test_full_api_flow(client):
     assert len(data["feedback"]) == 2
     kinds = {f["kind"] for f in data["feedback"]}
     assert kinds == {"comment", "thumbs_up"}
+
+    agent_row = (
+        await session.execute(select(Agent).where(Agent.agent_id == agent_id))
+    ).scalar_one()
+    art_row = (
+        await session.execute(
+            select(Artifact).where(Artifact.artifact_id == artifact_id)
+        )
+    ).scalar_one()
+    fetch_row = (
+        await session.execute(select(AuditLog).where(AuditLog.event == "fetch"))
+    ).scalar_one()
+    assert fetch_row.actor_agent_id == agent_row.id
+    assert fetch_row.on_behalf_of_human_id == agent_row.owner_human_id
+    assert fetch_row.target_artifact_id == art_row.id
+    assert fetch_row.target_version_no == 2
+    assert fetch_row.payload["include_feedback"] is True
+    assert fetch_row.actor_human_id is None
+
+    resp = await client.get(f"{BASE}/artifacts/{artifact_id}")
+    assert resp.status_code == 200, resp.text
+    human_row = (
+        await session.execute(
+            select(HumanUser).where(HumanUser.human_id == human_id)
+        )
+    ).scalar_one()
+    view_row = (
+        await session.execute(select(AuditLog).where(AuditLog.event == "view"))
+    ).scalar_one()
+    assert view_row.actor_human_id == human_row.id
+    assert view_row.target_artifact_id == art_row.id
+    assert view_row.target_version_no == 2
+    assert view_row.on_behalf_of_human_id is None
+    assert view_row.actor_agent_id is None
 
     resp = await client.get(
         f"{BASE}/artifacts/{artifact_id}/versions",
@@ -314,7 +354,7 @@ async def test_auth_failures(client):
 
 
 @pytest.mark.asyncio
-async def test_visibility(client):
+async def test_visibility(client, session):
     resp = await client.post(
         f"{BASE}/humans",
         json={"name": "vis-user", "email": "vis@example.com", "password": "s3cret-pass"},
@@ -445,6 +485,13 @@ async def test_visibility(client):
     assert data["context"] is not None
     assert data["context"]["prompt_snapshot"] == "public prompt"
     assert "feedback" not in data
+
+    anon_audit = (
+        await session.execute(
+            select(AuditLog).where(AuditLog.event.in_(["fetch", "view"]))
+        )
+    ).all()
+    assert anon_audit == []
 
     resp = await client.get(f"{BASE}/artifacts/{private_art_id}")
     assert resp.status_code == 404
