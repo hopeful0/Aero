@@ -5,6 +5,7 @@ from app.models.artifact import (
     Artifact,
     ArtifactLineage,
     ArtifactVersion,
+    ArtifactVersionBlock,
     ContextSnapshot,
 )
 from app.models.project import Project
@@ -194,6 +195,14 @@ class ArtifactRepo(BaseRepo):
         )
         return result.scalar_one_or_none()
 
+    async def get_child_lineages(self, parent_artifact_pk: int) -> list[ArtifactLineage]:
+        result = await self.session.execute(
+            select(ArtifactLineage)
+            .where(ArtifactLineage.parent_artifact_id == parent_artifact_pk)
+            .order_by(ArtifactLineage.created_at)
+        )
+        return list(result.scalars().all())
+
     async def get_context_snapshot(self, snapshot_pk: int) -> ContextSnapshot | None:
         result = await self.session.execute(
             select(ContextSnapshot).where(ContextSnapshot.id == snapshot_pk)
@@ -214,3 +223,48 @@ class ArtifactRepo(BaseRepo):
         self.session.add(snapshot)
         await self.session.flush()
         return snapshot
+
+    async def insert_version_blocks(
+        self,
+        version_pk: int,
+        blocks: list[dict],
+    ) -> list[ArtifactVersionBlock]:
+        rows = [
+            ArtifactVersionBlock(
+                artifact_version_id=version_pk,
+                block_id=b["block_id"],
+                block_path=b["block_path"],
+                block_index=b["block_index"],
+                block_text=b["block_text"],
+            )
+            for b in blocks
+        ]
+        self.session.add_all(rows)
+        await self.session.flush()
+        return rows
+
+    async def list_version_blocks(
+        self, version_pk: int
+    ) -> list[ArtifactVersionBlock]:
+        result = await self.session.execute(
+            select(ArtifactVersionBlock)
+            .where(ArtifactVersionBlock.artifact_version_id == version_pk)
+            .order_by(ArtifactVersionBlock.block_index)
+        )
+        return list(result.scalars().all())
+
+    async def get_version_block(
+        self, version_pk: int, block_id: str
+    ) -> ArtifactVersionBlock | None:
+        # block_id 是纯内容哈希，同一版本内重复段落/多个 hr 会共享一个
+        # block_id；重复块内容一致，锚定到第一条即可（避免 MultipleResultsFound）。
+        result = await self.session.execute(
+            select(ArtifactVersionBlock)
+            .where(
+                ArtifactVersionBlock.artifact_version_id == version_pk,
+                ArtifactVersionBlock.block_id == block_id,
+            )
+            .order_by(ArtifactVersionBlock.block_index)
+            .limit(1)
+        )
+        return result.scalar_one_or_none()

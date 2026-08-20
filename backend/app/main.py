@@ -1,3 +1,4 @@
+import structlog
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +11,7 @@ from app.api.v1.feedback import router as feedback_router
 from app.api.v1.lineage import router as lineage_router
 from app.core.config import settings
 from app.core.errors import AeroError
+from app.observability import setup_observability
 from app.skills import SKILL_MD
 
 
@@ -30,6 +32,13 @@ app.add_middleware(
 
 @app.exception_handler(AeroError)
 async def aero_error_handler(request: Request, exc: AeroError) -> JSONResponse:
+    structlog.get_logger("aero.error").warning(
+        "aero_error",
+        code=exc.code,
+        status=exc.status,
+        method=request.method,
+        path=request.url.path,
+    )
     return JSONResponse(
         status_code=exc.status,
         content=error_body(exc.code, exc.message, exc.details),
@@ -62,6 +71,11 @@ async def validation_error_handler(
 
 @app.exception_handler(Exception)
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    structlog.get_logger("aero.error").exception(
+        "unhandled_exception",
+        method=request.method,
+        path=request.url.path,
+    )
     return JSONResponse(
         status_code=500,
         content=error_body("INTERNAL", "internal error", None),
@@ -89,3 +103,6 @@ async def readyz() -> dict[str, str]:
 @app.get("/skill")
 async def get_skill() -> Response:
     return Response(content=SKILL_MD, media_type="text/markdown")
+
+
+setup_observability(app)

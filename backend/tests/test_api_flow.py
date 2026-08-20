@@ -687,3 +687,87 @@ async def test_change_visibility(client):
         json={"visibility": "org"},
     )
     assert resp.status_code == 422, resp.text
+
+
+@pytest.mark.asyncio
+async def test_lineage_includes_descendants(client):
+    human_email = "lin@example.com"
+    resp = await client.post(
+        f"{BASE}/humans",
+        json={"name": "lin", "email": human_email, "password": "s3cret-pass"},
+    )
+    assert resp.status_code == 201, resp.text
+    human_id = resp.json()["data"]["human_id"]
+
+    resp = await client.post(
+        f"{BASE}/auth/login",
+        json={"email": human_email, "password": "s3cret-pass"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = await client.post(f"{BASE}/projects", json={"name": "lin-proj"})
+    assert resp.status_code == 201, resp.text
+    project_id = resp.json()["data"]["project_id"]
+
+    resp = await client.post(
+        f"{BASE}/agents",
+        json={
+            "name": "lin-agent",
+            "owner_human_id": human_id,
+            "project_id": project_id,
+            "role": "both",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    agent_headers = {"Authorization": f"Bearer {resp.json()['data']['token']}"}
+
+    resp = await client.post(
+        f"{BASE}/artifacts",
+        json={"project_id": project_id, "title": "Root", "content": "# root"},
+        headers=agent_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    root_id = resp.json()["data"]["artifact_id"]
+
+    resp = await client.post(
+        f"{BASE}/artifacts/{root_id}/fork",
+        json={"new_title": "Child A"},
+        headers=agent_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    child_a_id = resp.json()["data"]["artifact_id"]
+
+    resp = await client.post(
+        f"{BASE}/artifacts/{child_a_id}/fork",
+        json={"new_title": "Grandchild"},
+        headers=agent_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    grandchild_id = resp.json()["data"]["artifact_id"]
+
+    resp = await client.post(
+        f"{BASE}/artifacts/{root_id}/fork",
+        json={"new_title": "Child B"},
+        headers=agent_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    child_b_id = resp.json()["data"]["artifact_id"]
+
+    resp = await client.get(f"{BASE}/artifacts/{root_id}/lineage")
+    assert resp.status_code == 200, resp.text
+    chain = resp.json()["data"]
+    assert len(chain) == 4
+    by_id = {n["artifact_id"]: n for n in chain}
+    assert by_id[root_id]["parent"] is None
+    assert by_id[child_a_id]["parent"]["artifact_id"] == root_id
+    assert by_id[grandchild_id]["parent"]["artifact_id"] == child_a_id
+    assert by_id[child_b_id]["parent"]["artifact_id"] == root_id
+
+    resp = await client.get(f"{BASE}/artifacts/{child_a_id}/lineage")
+    assert resp.status_code == 200, resp.text
+    chain = resp.json()["data"]
+    assert len(chain) == 3
+    by_id = {n["artifact_id"]: n for n in chain}
+    assert by_id[child_a_id]["parent"]["artifact_id"] == root_id
+    assert by_id[root_id]["parent"] is None
+    assert by_id[grandchild_id]["parent"]["artifact_id"] == child_a_id

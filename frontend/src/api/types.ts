@@ -4,6 +4,19 @@ export interface ContextSnapshot {
   execution_trace_id: string | null
 }
 
+// 行内评论锚点快照：创建评论时从 block 记录锁定，供 list_feedback 在线计算 migration_status。
+export interface InlineAnchor {
+  block_id: string
+  block_path: string
+  block_text: string
+  selector: string | null
+  version_no: number
+}
+
+// 行内评论迁移状态：以查看版本的 block map 为基准在线计算（不持久化）。
+// exact: 块完全匹配；fuzzy: 路径命中且文本相似；stale: 无法定位；null: 版本级评论。
+export type MigrationStatus = 'exact' | 'fuzzy' | 'stale'
+
 export interface Feedback {
   id: number
   artifact_id: string
@@ -11,8 +24,18 @@ export interface Feedback {
   author_human_id: string | null
   kind: FeedbackKind
   body: string | null
-  inline_anchor: Record<string, unknown> | null
+  inline_anchor: InlineAnchor | null
+  migration_status: MigrationStatus | null
   created_at: string
+}
+
+// 版本块映射：后端是 block_id 的权威源，前端只按 block_index 注入 DOM。
+export interface VersionBlock {
+  block_id: string
+  block_path: string
+  block_index: number
+  block_text: string
+  content_preview: string
 }
 
 export interface Artifact {

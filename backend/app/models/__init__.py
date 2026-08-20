@@ -3,6 +3,7 @@ from app.models.artifact import (
     Artifact,
     ArtifactLineage,
     ArtifactVersion,
+    ArtifactVersionBlock,
     ContextSnapshot,
 )
 from app.models.audit import AuditLog
@@ -16,6 +17,7 @@ __all__ = [
     "Artifact",
     "ArtifactLineage",
     "ArtifactVersion",
+    "ArtifactVersionBlock",
     "AuditLog",
     "Base",
     "ContextSnapshot",

@@ -288,6 +288,124 @@ textarea {
   padding: 2px 0;
 }
 
+.lineage__hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ---------- Lineage tree (reactflow) ---------- */
+.lineage-tree {
+  width: 100%;
+  height: min(62vh, 480px);
+  min-height: 320px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lineage-tree .react-flow__attribution {
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.lineage-tree__node {
+  width: 200px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.lineage-tree__node:hover {
+  border-color: var(--accent);
+}
+
+.lineage-tree__node--current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.lineage-tree__node--root {
+  border-style: dashed;
+}
+
+.lineage-tree__node-title {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lineage-tree__node-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.lineage-tree__ver {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.lineage-tree__tag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: var(--accent);
+  color: #0b1020;
+  font-weight: 600;
+}
+
+.lineage-tree__tag--root {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.lineage-tree .react-flow__edge-path {
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+
+.lineage-tree .react-flow__arrowclosed {
+  stroke: var(--border);
+  fill: var(--border);
+}
+
+.lineage-tree .react-flow__controls {
+  box-shadow: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.lineage-tree .react-flow__controls-button {
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  fill: var(--text);
+  width: 26px;
+  height: 26px;
+}
+
+.lineage-tree .react-flow__controls-button:hover {
+  background: var(--panel);
+}
+
+.lineage-tree .react-flow__controls-button svg {
+  fill: var(--muted);
+}
+
 /* ---------- Login ---------- */
 .login-page {
   max-width: 420px;
@@ -1111,4 +1229,83 @@ textarea {
   gap: 8px;
   justify-content: flex-end;
   margin-top: 12px;
+}
+
+/* ---------- Block anchor hover ---------- */
+[data-block-id] {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+[data-block-id]:hover {
+  background: rgba(91, 140, 255, 0.06);
+  border-radius: 4px;
+}
+
+/* ---------- md-pre-wrap (code block wrapper) ---------- */
+.md-pre-wrap {
+  margin: 0;
+}
+
+/* ---------- Inline comment panel ---------- */
+.inline-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inline-comment__block-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-comment__block-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.inline-comment__path {
+  font-size: 12px;
+  margin: 0;
+}
+
+.inline-comment__form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inline-comment__login-hint {
+  font-size: 13px;
+  margin: 0;
+}
+
+.feedback__item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ---------- Migration status badges ---------- */
+.chip--mig {
+  font-weight: 500;
+}
+
+.chip--mig-exact {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.chip--mig-fuzzy {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.chip--mig-stale {
+  border-color: var(--muted);
+  color: var(--muted);
 }

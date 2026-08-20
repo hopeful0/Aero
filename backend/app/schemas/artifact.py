@@ -88,5 +88,16 @@ class SearchParams(BaseModel):
     offset: int = 0
 
 
+class VersionBlockResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    block_id: str
+    block_path: str
+    block_index: int
+    block_text: str
+    content_preview: str
+
+
 PublishResponse = ApiResponse[ArtifactResponse]
 ArtifactListResponse = ApiResponse[list[ArtifactListItem]]
+VersionBlockListResponse = ApiResponse[list[VersionBlockResponse]]

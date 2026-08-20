@@ -15,5 +15,16 @@ class Settings(BaseSettings):
     argon2_memory_cost: int = 65536
     argon2_parallelism: int = 2
 
+    log_level: str = "INFO"
+    log_json: bool = True
+
+    prometheus_enabled: bool = True
+    prometheus_path: str = "/metrics"
+
+    otel_enabled: bool = False
+    otel_exporter_otlp_endpoint: str = ""
+    otel_exporter_otlp_protocol: str = "grpc"
+    otel_service_name: str = "aero-backend"
+
 
 settings = Settings()

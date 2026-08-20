@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.api.deps import CurrentHuman, CurrentPrincipal, FeedbackSvc
 from app.core.response import ok
@@ -21,14 +21,21 @@ async def create_feedback(
         artifact_id=artifact_id,
         kind=body.kind,
         body=body.body,
-        inline_anchor=body.inline_anchor,
+        block_id=body.block_id,
+        version_no=body.version_no,
+        selector=body.selector,
     )
     return ok(result)
 
 
 @router.get("/artifacts/{artifact_id}/feedback")
 async def list_feedback(
-    artifact_id: str, principal: CurrentPrincipal, service: FeedbackSvc
+    artifact_id: str,
+    principal: CurrentPrincipal,
+    service: FeedbackSvc,
+    version: int | None = Query(default=None, ge=1),
 ):
-    results = await service.list_feedback(principal, artifact_id)
+    results = await service.list_feedback(
+        principal, artifact_id, viewing_version=version
+    )
     return ok(results)

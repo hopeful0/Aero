@@ -16,6 +16,7 @@ import type {
   NewVersionResult,
   Project,
   PublishResult,
+  VersionBlock,
 } from './types'
 
 const qk = {
@@ -23,8 +24,10 @@ const qk = {
     ['artifact', id, version ?? null] as const,
   artifacts: (params: ArtifactListParams) => ['artifacts', params] as const,
   versions: (id: string) => ['versions', id] as const,
+  blocks: (id: string, version: number) => ['blocks', id, version] as const,
   lineage: (id: string) => ['lineage', id] as const,
-  feedback: (id: string) => ['feedback', id] as const,
+  feedback: (id: string, version?: number) =>
+    ['feedback', id, version ?? null] as const,
   projects: () => ['projects'] as const,
 }
 
@@ -58,6 +61,21 @@ export function useVersions(id: string | undefined) {
   })
 }
 
+// blocks 端点用 OptionalPrincipal：匿名可读 public 产物，前端不依赖登录态。
+export function useVersionBlocks(
+  id: string | undefined,
+  versionNo: number | undefined,
+) {
+  return useQuery<VersionBlock[]>({
+    queryKey: qk.blocks(id ?? '', versionNo ?? 0),
+    queryFn: () =>
+      http.get<VersionBlock[]>(
+        `/artifacts/${id}/versions/${versionNo}/blocks`,
+      ),
+    enabled: Boolean(id) && typeof versionNo === 'number',
+  })
+}
+
 export function useLineage(id: string | undefined) {
   const human = useAuthStore((s) => s.human)
   return useQuery<LineageNode[]>({
@@ -67,11 +85,16 @@ export function useLineage(id: string | undefined) {
   })
 }
 
-export function useFeedback(id: string | undefined) {
+// feedback list 端点用 CurrentPrincipal：需登录。version 参数决定 migration_status
+// 的计算基准（查看版本）；缺省时后端取 current_version。
+export function useFeedback(id: string | undefined, version?: number) {
   const human = useAuthStore((s) => s.human)
   return useQuery<Feedback[]>({
-    queryKey: qk.feedback(id ?? ''),
-    queryFn: () => http.get<Feedback[]>(`/artifacts/${id}/feedback`),
+    queryKey: qk.feedback(id ?? '', version),
+    queryFn: () =>
+      http.get<Feedback[]>(`/artifacts/${id}/feedback`, {
+        params: version ? { version } : undefined,
+      }),
     enabled: Boolean(id) && !!human,
   })
 }
@@ -206,13 +229,16 @@ export function useCreateFeedback(id: string) {
     {
       kind: FeedbackKind
       body?: string
-      inline_anchor?: Record<string, unknown>
+      block_id?: string
+      version_no?: number
+      selector?: string
     }
   >({
     mutationFn: (input) =>
       http.post<Feedback>(`/artifacts/${id}/feedback`, input),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: qk.feedback(id) })
+      // 前缀匹配所有 version 的 feedback 查询（整体 + 行内共用）。
+      void qc.invalidateQueries({ queryKey: ['feedback', id] })
       void qc.invalidateQueries({ queryKey: qk.artifact(id) })
     },
   })

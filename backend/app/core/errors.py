@@ -60,3 +60,12 @@ class BadRequestError(AeroError):
         details: dict[str, Any] | None = None,
     ) -> None:
         super().__init__("BAD_REQUEST", message, details, 400)
+
+
+class InvalidAnchorError(AeroError):
+    def __init__(
+        self,
+        message: str = "invalid inline anchor",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__("INVALID_ANCHOR", message, details, 400)

@@ -133,3 +133,29 @@ class ArtifactLineage(CreatedAtMixin, Base):
         BigInteger, ForeignKey("agent.id")
     )
     fork_note: Mapped[str | None] = mapped_column(Text)
+
+
+class ArtifactVersionBlock(CreatedAtMixin, Base):
+    __tablename__ = "artifact_version_block"
+    __table_args__ = (
+        Index(
+            "ix_artifact_version_block_version_id_block_index",
+            "artifact_version_id",
+            "block_index",
+            unique=True,
+        ),
+        Index("ix_artifact_version_block_version_id", "artifact_version_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    artifact_version_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("artifact_version.id"), nullable=False
+    )
+    block_id: Mapped[str] = mapped_column(String(16), nullable=False)
+    block_path: Mapped[str] = mapped_column(Text, nullable=False)
+    block_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    block_text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    @property
+    def content_preview(self) -> str:
+        return self.block_text[:80]

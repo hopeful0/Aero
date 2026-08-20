@@ -129,6 +129,17 @@ async def add_version(
     return ok(result)
 
 
+@router.get("/artifacts/{artifact_id}/versions/{version_no}/blocks")
+async def list_version_blocks(
+    artifact_id: str,
+    version_no: int,
+    principal: OptionalPrincipal,
+    service: ArtifactSvc,
+):
+    blocks = await service.list_version_blocks(principal, artifact_id, version_no)
+    return ok(blocks)
+
+
 @router.post("/artifacts/{artifact_id}/fork", status_code=201)
 async def fork(
     artifact_id: str,

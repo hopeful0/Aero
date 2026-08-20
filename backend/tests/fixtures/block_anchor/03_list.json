@@ -1,0 +1,33 @@
+{
+  "source": "03_list.md",
+  "block_count": 3,
+  "blocks": [
+    {
+      "block_index": 0,
+      "block_id": "308d5a0903f2c571",
+      "block_path": "h2:Lists",
+      "block_text": "Lists",
+      "content_preview": "Lists",
+      "source_start_line": 1,
+      "source_end_line": 1
+    },
+    {
+      "block_index": 1,
+      "block_id": "d61dae5584c0974c",
+      "block_path": "h2:Lists > list[0]",
+      "block_text": "item one\nitem two\nnested a\nnested b\ntodo\ndone",
+      "content_preview": "item one\nitem two\nnested a\nnested b\ntodo\ndone",
+      "source_start_line": 3,
+      "source_end_line": 9
+    },
+    {
+      "block_index": 2,
+      "block_id": "4252f8d56b4bb236",
+      "block_path": "h2:Lists > list[1]",
+      "block_text": "first\nsecond",
+      "content_preview": "first\nsecond",
+      "source_start_line": 10,
+      "source_end_line": 11
+    }
+  ]
+}

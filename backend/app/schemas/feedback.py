@@ -9,7 +9,10 @@ from app.schemas.common import ApiResponse
 class FeedbackCreate(BaseModel):
     kind: Literal["thumbs_up", "thumbs_down", "comment"]
     body: str | None = None
-    inline_anchor: dict | None = None
+    # 行内评论锚点：block_id 命中 version_no 对应版本 block map；selector 为前端 DOM 选择器。
+    block_id: str | None = None
+    version_no: int | None = None
+    selector: str | None = None
 
 
 class FeedbackResponse(BaseModel):
@@ -22,6 +25,8 @@ class FeedbackResponse(BaseModel):
     kind: str
     body: str | None = None
     inline_anchor: dict | None = None
+    # 仅带 block_id 的行内评论有 migration_status（exact/fuzzy/stale）；版本级评论为 null。
+    migration_status: str | None = None
     created_at: datetime
 
 

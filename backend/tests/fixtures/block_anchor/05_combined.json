@@ -1,0 +1,87 @@
+{
+  "source": "05_combined.md",
+  "block_count": 9,
+  "blocks": [
+    {
+      "block_index": 0,
+      "block_id": "53705746371cd9ed",
+      "block_path": "h1:Title Here",
+      "block_text": "Title Here",
+      "content_preview": "Title Here",
+      "source_start_line": 1,
+      "source_end_line": 1
+    },
+    {
+      "block_index": 1,
+      "block_id": "6c01450294e9761c",
+      "block_path": "h1:Title Here > p[0]",
+      "block_text": "A paragraph with soft\nbreak.",
+      "content_preview": "A paragraph with soft\nbreak.",
+      "source_start_line": 3,
+      "source_end_line": 4
+    },
+    {
+      "block_index": 2,
+      "block_id": "9cf47936ee734c1a",
+      "block_path": "h1:Title Here > p[1]",
+      "block_text": "Another para with hardbreak.",
+      "content_preview": "Another para with hardbreak.",
+      "source_start_line": 6,
+      "source_end_line": 7
+    },
+    {
+      "block_index": 3,
+      "block_id": "90143563bdec98d4",
+      "block_path": "h1:Title Here > list[0]",
+      "block_text": "item one\ntask unchecked\ntask checked",
+      "content_preview": "item one\ntask unchecked\ntask checked",
+      "source_start_line": 9,
+      "source_end_line": 12
+    },
+    {
+      "block_index": 4,
+      "block_id": "957e13c0732e48fd",
+      "block_path": "h1:Title Here > code[0]",
+      "block_text": "print(\"hello\")",
+      "content_preview": "print(\"hello\")",
+      "source_start_line": 13,
+      "source_end_line": 15
+    },
+    {
+      "block_index": 5,
+      "block_id": "acfd53195593cee4",
+      "block_path": "h1:Title Here > quote[0]",
+      "block_text": "a quote",
+      "content_preview": "a quote",
+      "source_start_line": 17,
+      "source_end_line": 17
+    },
+    {
+      "block_index": 6,
+      "block_id": "df31a43638a08a05",
+      "block_path": "h1:Title Here > table[0]",
+      "block_text": "a | b\n1 | 2",
+      "content_preview": "a | b\n1 | 2",
+      "source_start_line": 19,
+      "source_end_line": 21
+    },
+    {
+      "block_index": 7,
+      "block_id": "1b52f3a2e1514873",
+      "block_path": "h1:Title Here > hr[0]",
+      "block_text": "hr",
+      "content_preview": "hr",
+      "source_start_line": 23,
+      "source_end_line": 23
+    },
+    {
+      "block_index": 8,
+      "block_id": "e4c130e183be21d2",
+      "block_path": "h1:Title Here > html[0]",
+      "block_text": "<div>raw html</div>",
+      "content_preview": "<div>raw html</div>",
+      "source_start_line": 25,
+      "source_end_line": 25
+    }
+  ]
+}

@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useArtifact, useFeedback, useCreateFeedback } from '@/api/hooks'
+import {
+  useArtifact,
+  useCreateFeedback,
+  useFeedback,
+  useVersionBlocks,
+} from '@/api/hooks'
 import { useAuthStore } from '@/store/auth'
 import { ApiError } from '@/api/client'
 import MarkdownRender from '@/components/render/MarkdownRender'
@@ -8,6 +13,8 @@ import LineageDrawer from '@/components/lineage/LineageDrawer'
 import VisibilityBadge from '@/components/artifact/VisibilityBadge'
 import ShareControl from '@/components/artifact/ShareControl'
 import AnonymousCta from '@/components/artifact/AnonymousCta'
+import InlineCommentLayer from '@/components/inline/InlineCommentLayer'
+import MigrationBadge from '@/components/inline/MigrationBadge'
 import type { FeedbackKind } from '@/api/types'
 
 export default function ArtifactView() {
@@ -18,13 +25,18 @@ export default function ArtifactView() {
   const [localVisibility, setLocalVisibility] = useState<'private' | 'public'>(
     'private',
   )
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   const {
     data: artifact,
     isLoading,
     error,
   } = useArtifact(artifactId)
-  const { data: feedbackList } = useFeedback(artifactId)
+  // 行内评论依赖查看版本的 block 列表注入 data-block-id；blocks 端点匿名可读 public。
+  const viewingVersion = artifact?.version
+  const { data: blocks } = useVersionBlocks(artifactId, viewingVersion)
+  // 带 version 参数：后端据此在线计算 migration_status（基于查看版本 block map）。
+  const { data: feedbackList } = useFeedback(artifactId, viewingVersion)
   const feedbackMut = useCreateFeedback(artifactId ?? '')
 
   useEffect(() => {
@@ -78,7 +90,27 @@ export default function ArtifactView() {
     }
   }
 
-  const feedbacks = artifact.feedback ?? feedbackList ?? []
+  const onInlineComment = async (input: {
+    body: string
+    block_id: string
+    version_no: number
+  }) => {
+    await feedbackMut.mutateAsync({
+      kind: 'comment',
+      body: input.body,
+      block_id: input.block_id,
+      version_no: input.version_no,
+      selector: `[data-block-id="${input.block_id}"]`,
+    })
+  }
+
+  // 优先用 feedback 端点的数据（带 migration_status）；artifact.feedback 无迁移状态，仅作兜底。
+  const feedbacks = feedbackList ?? artifact.feedback ?? []
+  // 版本级区域：版本级评论（null）+ stale 行内评论（降级提示）。行内 exact/fuzzy
+  // 由 InlineCommentLayer 在块面板里展示，避免重复。
+  const versionLevelFeedbacks = feedbacks.filter(
+    (fb) => fb.migration_status === null || fb.migration_status === 'stale',
+  )
   const ctx = artifact.context ?? null
 
   return (
@@ -133,8 +165,11 @@ export default function ArtifactView() {
         </div>
       </header>
 
-      <div className="artifact__body">
-        <MarkdownRender content={artifact.content ?? ''} />
+      <div className="artifact__body" ref={bodyRef}>
+        <MarkdownRender
+          content={artifact.content ?? ''}
+          blocks={blocks}
+        />
       </div>
 
       {ctx ? (
@@ -217,18 +252,23 @@ export default function ArtifactView() {
           ) : null}
 
           <h4 className="feedback__subhead">已有反馈</h4>
-          {feedbacks.length > 0 ? (
+          {versionLevelFeedbacks.length > 0 ? (
             <ul className="feedback__list">
-              {feedbacks.map((fb) => (
+              {versionLevelFeedbacks.map((fb) => (
                 <li key={fb.id} className="feedback__item">
-                  <span className={`chip chip--fb chip--fb-${fb.kind}`}>
-                    {fb.kind}
-                  </span>
-                  <span className="meta-label">v{fb.version_no}</span>
-                  {fb.body ? <p className="feedback__body">{fb.body}</p> : null}
-                  <time className="meta-label">
-                    {new Date(fb.created_at).toLocaleString()}
-                  </time>
+                  <div className="feedback__item-head">
+                    <span className={`chip chip--fb chip--fb-${fb.kind}`}>
+                      {fb.kind}
+                    </span>
+                    <MigrationBadge status={fb.migration_status} />
+                    <span className="meta-label">v{fb.version_no}</span>
+                    <time className="meta-label">
+                      {new Date(fb.created_at).toLocaleString()}
+                    </time>
+                  </div>
+                  {fb.body ? (
+                    <p className="feedback__body">{fb.body}</p>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -239,6 +279,17 @@ export default function ArtifactView() {
       ) : (
         <AnonymousCta next={`/artifacts/${artifactId}`} />
       )}
+
+      <InlineCommentLayer
+        blocks={blocks ?? []}
+        feedbacks={feedbacks}
+        canComment={Boolean(human)}
+        containerRef={bodyRef}
+        onSubmit={onInlineComment}
+        submitting={feedbackMut.isPending}
+        submitError={feedbackMut.error}
+        versionNo={viewingVersion ?? 1}
+      />
 
       {human ? (
         <LineageDrawer

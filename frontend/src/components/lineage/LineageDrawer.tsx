@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import Drawer from '@/components/Drawer'
 import { useLineage } from '@/api/hooks'
-import type { LineageNode } from '@/api/types'
+import LineageTree from './LineageTree'
 
 interface LineageDrawerProps {
   artifactId: string
@@ -19,10 +19,15 @@ export default function LineageDrawer({
   const { data: chain, isLoading, error } = useLineage(open ? artifactId : undefined)
   const navigate = useNavigate()
 
+  const handleSelect = (id: string) => {
+    onOpenChange(false)
+    navigate(`/artifacts/${id}`)
+  }
+
   return (
     <Drawer
       title="血统面板"
-      description="源 Agent · 上游 lineage · 上下文快照"
+      description="源 Agent · fork 演进树"
       open={open}
       onOpenChange={onOpenChange}
     >
@@ -32,7 +37,7 @@ export default function LineageDrawer({
           {creatorAgentId ?? '—'}
         </p>
 
-        <h3 className="lineage__heading">上游 lineage 树</h3>
+        <h3 className="lineage__heading">fork 演进树</h3>
         {isLoading ? (
           <p className="lineage__muted">加载中…</p>
         ) : error ? (
@@ -40,43 +45,18 @@ export default function LineageDrawer({
             {error instanceof Error ? error.message : '加载失败'}
           </p>
         ) : chain && chain.length > 0 ? (
-          <ol className="lineage__chain">
-            {chain.map((node: LineageNode, idx) => (
-              <li
-                key={node.artifact_id}
-                className={
-                  'lineage__node' +
-                  (idx === 0 ? ' lineage__node--current' : '')
-                }
-              >
-                <button
-                  type="button"
-                  className="lineage__node-title"
-                  onClick={() => navigate(`/artifacts/${node.artifact_id}`)}
-                >
-                  {node.title} <span className="lineage__ver">v{node.current_version}</span>
-                </button>
-                {node.parent ? (
-                  <span className="lineage__parent">
-                    ← forked from {node.parent.artifact_id} (v{node.parent.version_no})
-                  </span>
-                ) : (
-                  <span className="lineage__root">[root]</span>
-                )}
-                <ul className="lineage__versions">
-                  {node.versions.map((v) => (
-                    <li key={v.version_no}>
-                      v{v.version_no}
-                      {v.title ? ` · ${v.title}` : ''}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ol>
+          <LineageTree
+            key={artifactId}
+            chain={chain}
+            currentArtifactId={artifactId}
+            onSelect={handleSelect}
+          />
         ) : (
           <p className="lineage__muted">无 lineage 数据</p>
         )}
+        <p className="lineage__hint">
+          根节点为源产物，自上而下为 fork 演进链路（向上祖先、向下后代），当前产物高亮显示。点击节点可跳转。
+        </p>
       </section>
     </Drawer>
   )

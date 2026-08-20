@@ -2,8 +2,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ForbiddenError, NotFoundError, VersionConflictError
 from app.models.agent import Agent
-from app.models.artifact import Artifact
+from app.models.artifact import Artifact, ArtifactVersion
 from app.models.project import HumanUser
+from app.observability.metrics import track_artifact_operation
 from app.repos.agent import AgentRepo
 from app.repos.artifact import ArtifactRepo
 from app.repos.audit import AuditRepo
@@ -11,6 +12,7 @@ from app.repos.feedback import FeedbackRepo
 from app.repos.project import ProjectRepo
 from app.schemas.artifact import SearchParams
 from app.services.auth_service import READ_ROLES, WRITE_ROLES, Principal
+from app.services.block_parser import parse_blocks
 
 
 class ArtifactService:
@@ -21,6 +23,25 @@ class ArtifactService:
         self.project_repo = ProjectRepo(session)
         self.audit_repo = AuditRepo(session)
         self.feedback_repo = FeedbackRepo(session)
+
+    async def _persist_version_blocks(
+        self, version: ArtifactVersion, content: str
+    ) -> None:
+        blocks = parse_blocks(content)
+        if not blocks:
+            return
+        await self.artifact_repo.insert_version_blocks(
+            version_pk=version.id,
+            blocks=[
+                {
+                    "block_id": b.block_id,
+                    "block_path": b.block_path,
+                    "block_index": b.block_index,
+                    "block_text": b.block_text,
+                }
+                for b in blocks
+            ],
+        )
 
     async def _assert_agent_write_scope(self, agent: Agent, project_pk: int) -> None:
         scope = await self.agent_repo.get_project_scope_by_pk(agent.id, project_pk)
@@ -64,6 +85,7 @@ class ArtifactService:
             raise NotFoundError("artifact archived", {"artifact_id": artifact_id})
         return artifact
 
+    @track_artifact_operation("publish")
     async def publish(
         self,
         agent: Agent,
@@ -100,7 +122,7 @@ class ArtifactService:
             owner_human_pk=agent.owner_human_id,
             visibility=visibility,
         )
-        await self.artifact_repo.insert_version(
+        version = await self.artifact_repo.insert_version(
             artifact_pk=artifact.id,
             version_no=1,
             title=title,
@@ -111,6 +133,7 @@ class ArtifactService:
             created_by_agent_pk=agent.id,
             context_snapshot_pk=context_pk,
         )
+        await self._persist_version_blocks(version, content)
         await self.audit_repo.write_audit_log(
             event="publish",
             actor_agent_id=agent.id,
@@ -246,6 +269,35 @@ class ArtifactService:
             for v in versions
         ]
 
+    async def list_version_blocks(
+        self, principal: Principal, artifact_id: str, version_no: int
+    ) -> list[dict]:
+        # 前端 MarkdownRender 用本端点拿 block_id 注入到对应 DOM 节点，行内评论锚定依赖此映射。
+        artifact = await self._resolve_artifact(artifact_id)
+        is_anon = principal.kind == "anonymous"
+        if artifact.visibility != "public":
+            if is_anon:
+                raise NotFoundError("artifact not found", {"artifact_id": artifact_id})
+            await self._assert_principal_read_scope(principal, artifact.project_id)
+        v = await self.artifact_repo.get_version(artifact.id, version_no)
+        if v is None:
+            raise NotFoundError(
+                "version not found",
+                {"artifact_id": artifact_id, "version": version_no},
+            )
+        blocks = await self.artifact_repo.list_version_blocks(v.id)
+        return [
+            {
+                "block_id": b.block_id,
+                "block_path": b.block_path,
+                "block_index": b.block_index,
+                "block_text": b.block_text,
+                "content_preview": b.content_preview,
+            }
+            for b in blocks
+        ]
+
+    @track_artifact_operation("add_version")
     async def add_version(
         self,
         agent: Agent,
@@ -270,7 +322,7 @@ class ArtifactService:
             )
             context_pk = snap.id
 
-        await self.artifact_repo.insert_version(
+        version = await self.artifact_repo.insert_version(
             artifact_pk=artifact.id,
             version_no=new_no,
             title=title,
@@ -281,6 +333,7 @@ class ArtifactService:
             created_by_agent_pk=agent.id,
             context_snapshot_pk=context_pk,
         )
+        await self._persist_version_blocks(version, content)
         affected = await self.artifact_repo.update_current_version(artifact.id, new_no)
         if affected == 0:
             fresh = await self.artifact_repo.get_artifact(artifact.id)
@@ -302,6 +355,7 @@ class ArtifactService:
             "version": new_no,
         }
 
+    @track_artifact_operation("fork")
     async def fork(
         self,
         agent: Agent,
@@ -344,7 +398,7 @@ class ArtifactService:
             owner_human_pk=agent.owner_human_id,
             visibility="private",
         )
-        await self.artifact_repo.insert_version(
+        child_version = await self.artifact_repo.insert_version(
             artifact_pk=child.id,
             version_no=1,
             title=fork_title,
@@ -355,6 +409,7 @@ class ArtifactService:
             created_by_agent_pk=agent.id,
             context_snapshot_pk=context_pk,
         )
+        await self._persist_version_blocks(child_version, fork_content)
         await self.artifact_repo.insert_fork_lineage(
             child_artifact_pk=child.id,
             parent_artifact_pk=parent.id,
@@ -426,6 +481,7 @@ class ArtifactService:
             for a in results
         ]
 
+    @track_artifact_operation("change_visibility")
     async def change_visibility(
         self,
         human: HumanUser,

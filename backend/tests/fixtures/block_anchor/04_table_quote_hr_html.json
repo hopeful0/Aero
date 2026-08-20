@@ -1,0 +1,51 @@
+{
+  "source": "04_table_quote_hr_html.md",
+  "block_count": 5,
+  "blocks": [
+    {
+      "block_index": 0,
+      "block_id": "f340b6d6edeff462",
+      "block_path": "h1:Mixed",
+      "block_text": "Mixed",
+      "content_preview": "Mixed",
+      "source_start_line": 1,
+      "source_end_line": 1
+    },
+    {
+      "block_index": 1,
+      "block_id": "4f8727d9a77f61a9",
+      "block_path": "h1:Mixed > quote[0]",
+      "block_text": "a quote\nsecond line",
+      "content_preview": "a quote\nsecond line",
+      "source_start_line": 3,
+      "source_end_line": 4
+    },
+    {
+      "block_index": 2,
+      "block_id": "e4cb2cca767706ee",
+      "block_path": "h1:Mixed > table[0]",
+      "block_text": "col1 | col2\na | b\nc | d",
+      "content_preview": "col1 | col2\na | b\nc | d",
+      "source_start_line": 6,
+      "source_end_line": 9
+    },
+    {
+      "block_index": 3,
+      "block_id": "1b52f3a2e1514873",
+      "block_path": "h1:Mixed > hr[0]",
+      "block_text": "hr",
+      "content_preview": "hr",
+      "source_start_line": 11,
+      "source_end_line": 11
+    },
+    {
+      "block_index": 4,
+      "block_id": "c043453c93262736",
+      "block_path": "h1:Mixed > html[0]",
+      "block_text": "<div class=\"note\">html</div>",
+      "content_preview": "<div class=\"note\">html</div>",
+      "source_start_line": 13,
+      "source_end_line": 13
+    }
+  ]
+}
