@@ -9,6 +9,7 @@ from app.api.v1.artifacts import router as artifacts_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.feedback import router as feedback_router
 from app.api.v1.lineage import router as lineage_router
+from app.api.v1.share_tokens import router as share_tokens_router
 from app.core.config import settings
 from app.core.errors import AeroError
 from app.observability import setup_observability
@@ -88,6 +89,7 @@ app.include_router(admin_router, prefix=prefix)
 app.include_router(artifacts_router, prefix=prefix)
 app.include_router(feedback_router, prefix=prefix)
 app.include_router(lineage_router, prefix=prefix)
+app.include_router(share_tokens_router, prefix=prefix)
 
 
 @app.get("/healthz")

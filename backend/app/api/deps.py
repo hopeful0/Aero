@@ -14,6 +14,7 @@ from app.services.artifact_service import ArtifactService
 from app.services.auth_service import AuthService, Principal
 from app.services.feedback_service import FeedbackService
 from app.services.lineage_service import LineageService
+from app.services.share_token_service import ShareTokenService
 
 BearerHeader = Annotated[str | None, Header(alias="Authorization")]
 
@@ -38,6 +39,12 @@ def get_lineage_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> LineageService:
     return LineageService(session)
+
+
+def get_share_token_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ShareTokenService:
+    return ShareTokenService(session)
 
 
 async def get_current_agent(
@@ -103,3 +110,4 @@ AdminSvc = Annotated[AdminService, Depends(get_admin_service)]
 ArtifactSvc = Annotated[ArtifactService, Depends(get_artifact_service)]
 FeedbackSvc = Annotated[FeedbackService, Depends(get_feedback_service)]
 LineageSvc = Annotated[LineageService, Depends(get_lineage_service)]
+ShareTokenSvc = Annotated[ShareTokenService, Depends(get_share_token_service)]

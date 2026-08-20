@@ -150,29 +150,21 @@ class ArtifactService:
             "web_url": f"/artifacts/{artifact.artifact_id}",
         }
 
-    async def get_artifact(
+    async def _serialize_artifact_view(
         self,
-        principal: Principal,
-        artifact_id: str,
-        version: int | None = None,
-        include_context: bool = False,
-        include_feedback: bool = False,
-    ) -> dict:
-        artifact = await self._resolve_artifact(artifact_id)
-        is_anon = principal.kind == "anonymous"
-        if artifact.visibility == "public":
-            pass
-        else:
-            if is_anon:
-                raise NotFoundError("artifact not found", {"artifact_id": artifact_id})
-            await self._assert_principal_read_scope(principal, artifact.project_id)
-
+        artifact: Artifact,
+        version: int | None,
+        *,
+        include_context: bool,
+        include_feedback: bool,
+        is_anon: bool,
+    ) -> tuple[dict, int]:
         version_no = version if version is not None else artifact.current_version
         v = await self.artifact_repo.get_version(artifact.id, version_no)
         if v is None:
             raise NotFoundError(
                 "version not found",
-                {"artifact_id": artifact_id, "version": version_no},
+                {"artifact_id": artifact.artifact_id, "version": version_no},
             )
 
         project = await self.project_repo.get_by_id(artifact.project_id)
@@ -225,6 +217,32 @@ class ArtifactService:
                 }
                 for fb in feedbacks
             ]
+        return data, version_no
+
+    async def get_artifact(
+        self,
+        principal: Principal,
+        artifact_id: str,
+        version: int | None = None,
+        include_context: bool = False,
+        include_feedback: bool = False,
+    ) -> dict:
+        artifact = await self._resolve_artifact(artifact_id)
+        is_anon = principal.kind == "anonymous"
+        if artifact.visibility == "public":
+            pass
+        else:
+            if is_anon:
+                raise NotFoundError("artifact not found", {"artifact_id": artifact_id})
+            await self._assert_principal_read_scope(principal, artifact.project_id)
+
+        data, version_no = await self._serialize_artifact_view(
+            artifact,
+            version,
+            include_context=include_context,
+            include_feedback=include_feedback,
+            is_anon=is_anon,
+        )
 
         if principal.kind == "agent" and principal.agent is not None:
             await self.audit_repo.write_audit_log(
@@ -245,6 +263,23 @@ class ArtifactService:
                 payload={"version": version_no, "include_feedback": include_feedback},
             )
             await self.session.commit()
+        return data
+
+    async def get_artifact_no_auth(
+        self,
+        artifact_id: str,
+        version: int | None = None,
+        *,
+        include_context: bool = True,
+    ) -> dict:
+        artifact = await self._resolve_artifact(artifact_id)
+        data, _ = await self._serialize_artifact_view(
+            artifact,
+            version,
+            include_context=include_context,
+            include_feedback=False,
+            is_anon=True,
+        )
         return data
 
     async def list_versions(self, principal: Principal, artifact_id: str) -> list[dict]:

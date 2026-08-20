@@ -10,6 +10,7 @@ from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.feedback import Feedback
 from app.models.project import HumanProjectScope, HumanUser, Project
+from app.models.share_token import ShareToken
 
 __all__ = [
     "Agent",
@@ -25,4 +26,5 @@ __all__ = [
     "HumanProjectScope",
     "HumanUser",
     "Project",
+    "ShareToken",
 ]
