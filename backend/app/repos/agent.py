@@ -1,7 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.models.agent import Agent, AgentProjectScope
-from app.models.project import Project
+from app.models.project import HumanProjectScope, Project
 from app.repos.base import BaseRepo
 
 
@@ -88,3 +88,46 @@ class AgentRepo(BaseRepo):
             )
         )
         return list(result.scalars().all())
+
+    async def list_agents_for_human(self, human_pk: int) -> list[Agent]:
+        """Agents visible to a human: those the human owns, or those that hold a
+        scope on any project the human can access."""
+        accessible_project_pks = (
+            select(HumanProjectScope.project_id).where(
+                HumanProjectScope.human_id == human_pk
+            )
+        ).scalar_subquery()
+        stmt = (
+            select(Agent)
+            .outerjoin(
+                AgentProjectScope,
+                AgentProjectScope.agent_id == Agent.id,
+            )
+            .where(
+                or_(
+                    Agent.owner_human_id == human_pk,
+                    AgentProjectScope.project_id.in_(accessible_project_pks),
+                )
+            )
+            .distinct()
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def delete_agent_scope(
+        self, agent_pk: int, project_pk: int
+    ) -> bool:
+        """Remove one agent↔project scope. Idempotent: returns whether a row
+        was actually deleted."""
+        result = await self.session.execute(
+            select(AgentProjectScope).where(
+                AgentProjectScope.agent_id == agent_pk,
+                AgentProjectScope.project_id == project_pk,
+            )
+        )
+        scope = result.scalar_one_or_none()
+        if scope is None:
+            return False
+        await self.session.delete(scope)
+        await self.session.flush()
+        return True

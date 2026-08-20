@@ -4,6 +4,7 @@ import { useProjects } from '@/api/hooks'
 import ProjectCreateForm from '@/components/onboarding/ProjectCreateForm'
 import AgentCreateForm from '@/components/onboarding/AgentCreateForm'
 import AgentTokenDisplay from '@/components/onboarding/AgentTokenDisplay'
+import ScopeManager from '@/components/scope/ScopeManager'
 import type { AgentCreateResult } from '@/api/types'
 
 type CreatedAgent = Omit<AgentCreateResult, 'token'> & {
@@ -84,6 +85,8 @@ export default function Onboarding() {
         onOpenChange={handleTokenOpenChange}
         onReset={handleReset}
       />
+
+      <ScopeManager />
 
       <div className="onboarding__actions">
         <Link className="btn btn--ghost" to="/">

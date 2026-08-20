@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { http } from './client'
 import { useAuthStore } from '@/store/auth'
 import type {
+  AddAgentScopeInput,
   AgentCreateResult,
+  AgentScopeInfo,
   Artifact,
   ArtifactListItem,
   ArtifactListParams,
@@ -29,6 +31,7 @@ const qk = {
   feedback: (id: string, version?: number) =>
     ['feedback', id, version ?? null] as const,
   projects: () => ['projects'] as const,
+  agentScopes: () => ['agentScopes'] as const,
 }
 
 export function useArtifact(id: string | undefined, version?: number) {
@@ -259,6 +262,38 @@ export function useToggleVisibility(id: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['artifact', id] })
       void qc.invalidateQueries({ queryKey: ['artifacts'] })
+    },
+  })
+}
+
+// A-2 scope 管理
+export function useAgentScopes() {
+  const human = useAuthStore((s) => s.human)
+  return useQuery<AgentScopeInfo[]>({
+    queryKey: qk.agentScopes(),
+    queryFn: () => http.get<AgentScopeInfo[]>('/agents'),
+    enabled: !!human,
+  })
+}
+
+export function useAddAgentScope(agentId: string) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, AddAgentScopeInput>({
+    mutationFn: (input) =>
+      http.post<void>(`/agents/${agentId}/scopes`, input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.agentScopes() })
+    },
+  })
+}
+
+export function useRevokeAgentScope(agentId: string) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { projectId: string }>({
+    mutationFn: ({ projectId }) =>
+      http.delete<void>(`/agents/${agentId}/scopes/${projectId}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.agentScopes() })
     },
   })
 }

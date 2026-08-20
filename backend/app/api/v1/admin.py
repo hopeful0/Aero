@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.api.deps import AdminSvc, CurrentAgent, CurrentHuman
 from app.core.response import ok
-from app.schemas.auth import AgentCreateRequest, HumanRegisterRequest
+from app.schemas.auth import AgentCreateRequest, AgentScopeRequest, HumanRegisterRequest
 from app.schemas.project import ProjectCreateRequest
 
 router = APIRouter(tags=["admin"])
@@ -63,3 +63,33 @@ async def create_agent(
 @router.get("/agents/me")
 async def get_agent_self(agent: CurrentAgent, admin_service: AdminSvc):
     return ok(await admin_service.get_agent_self(agent))
+
+
+@router.get("/agents")
+async def list_agents(human: CurrentHuman, admin_service: AdminSvc):
+    """List all agents visible to the current human, with project scopes."""
+    return ok(await admin_service.list_agents_for_human(human))
+
+
+@router.post("/agents/{agent_id}/scopes", status_code=201)
+async def add_agent_scope(
+    agent_id: str,
+    body: AgentScopeRequest,
+    human: CurrentHuman,
+    admin_service: AdminSvc,
+):
+    """Grant or update an agent's scope on a project (owner-scope subset rule)."""
+    return ok(
+        await admin_service.add_agent_scope(human, agent_id, body.project_id, body.role)
+    )
+
+
+@router.delete("/agents/{agent_id}/scopes/{project_id}")
+async def revoke_agent_scope(
+    agent_id: str,
+    project_id: str,
+    human: CurrentHuman,
+    admin_service: AdminSvc,
+):
+    """Revoke an agent's scope on a project. Idempotent."""
+    return ok(await admin_service.revoke_agent_scope(human, agent_id, project_id))

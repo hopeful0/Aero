@@ -35,3 +35,8 @@ class AgentResponse(BaseModel):
     name: str | None = None
     owner_human_id: str
     token: str
+
+
+class AgentScopeRequest(BaseModel):
+    project_id: str
+    role: str

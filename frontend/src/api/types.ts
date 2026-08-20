@@ -144,6 +144,29 @@ export interface AgentCreateResult {
   token: string
 }
 
+// A-2 scope 管理：agent↔project 授予/回收
+export interface AgentScopeProject {
+  project_id: string
+  name: string
+  role: string
+  current_human_role: string | null
+}
+
+export interface AgentScopeInfo {
+  agent_id: string
+  name: string | null
+  owner_human_id: string
+  is_active: boolean
+  projects: AgentScopeProject[]
+}
+
+export interface AddAgentScopeInput {
+  project_id: string
+  role: string
+}
+
+export type AgentRole = 'publisher' | 'consumer' | 'both'
+
 export interface ArtifactListParams {
   project_id?: string
   tags?: string[]
