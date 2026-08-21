@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import Drawer from '@/components/Drawer'
-import { useToggleVisibility } from '@/api/hooks'
+import {
+  useCreateShareToken,
+  useRevokeShareToken,
+  useToggleVisibility,
+} from '@/api/hooks'
+import type { ShareTokenCreateResult } from '@/api/types'
 
 interface ShareControlProps {
   artifactId: string
@@ -16,7 +21,11 @@ export default function ShareControl({
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [activeLink, setActiveLink] = useState<ShareTokenCreateResult | null>(null)
+  const [linkError, setLinkError] = useState<string | null>(null)
   const toggleMut = useToggleVisibility(artifactId)
+  const createTokenMut = useCreateShareToken()
+  const revokeTokenMut = useRevokeShareToken()
   const copyTimer = useRef<number | null>(null)
 
   useEffect(
@@ -52,8 +61,7 @@ export default function ShareControl({
     await doToggle()
   }
 
-  const onCopyLink = async () => {
-    const url = `${window.location.origin}/artifacts/${artifactId}`
+  const flashCopied = async (url: string) => {
     try {
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(url)
@@ -73,6 +81,30 @@ export default function ShareControl({
     }
   }
 
+  const onCreateLink = async () => {
+    setLinkError(null)
+    try {
+      const created = await createTokenMut.mutateAsync({ artifactId })
+      setActiveLink(created)
+    } catch (e) {
+      setLinkError(e instanceof Error ? e.message : '生成失败')
+    }
+  }
+
+  const onRevokeLink = async () => {
+    if (!activeLink) return
+    setLinkError(null)
+    try {
+      await revokeTokenMut.mutateAsync({
+        artifactId,
+        tokenId: activeLink.share_token_id,
+      })
+      setActiveLink(null)
+    } catch (e) {
+      setLinkError(e instanceof Error ? e.message : '吊销失败')
+    }
+  }
+
   return (
     <div className="share-control">
       <button
@@ -85,17 +117,49 @@ export default function ShareControl({
       >
         {toggling ? '处理中…' : visibility === 'public' ? '设为私有' : '设为公开'}
       </button>
-      {visibility === 'public' ? (
-        <button
-          type="button"
-          className="btn btn--ghost"
-          onClick={onCopyLink}
-          aria-label="复制分享链接"
-        >
-          {copied ? '已复制' : '复制分享链接'}
-        </button>
-      ) : null}
       {errorMsg ? <p className="error">{errorMsg}</p> : null}
+      <div className="share-control__token">
+        <div className="share-control__token-head">
+          <span className="muted">匿名定向分享</span>
+          {activeLink ? (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => void flashCopied(activeLink.url)}
+              aria-label="复制分享链接"
+            >
+              {copied ? '已复制' : '复制链接'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => void onCreateLink()}
+              disabled={createTokenMut.isPending}
+            >
+              {createTokenMut.isPending ? '生成中…' : '生成链接'}
+            </button>
+          )}
+        </div>
+        {activeLink ? (
+          <div className="share-control__token-box">
+            <code className="share-control__token-url">{activeLink.url}</code>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => void onRevokeLink()}
+              disabled={revokeTokenMut.isPending}
+            >
+              {revokeTokenMut.isPending ? '吊销中…' : '吊销'}
+            </button>
+          </div>
+        ) : (
+          <p className="share-control__token-hint muted">
+            生成一次性匿名链接，无需登录即可查看该产物（不含行内评论与反馈）。
+          </p>
+        )}
+        {linkError ? <p className="error">{linkError}</p> : null}
+      </div>
       <Drawer
         title="确认设为公开"
         open={confirmOpen}

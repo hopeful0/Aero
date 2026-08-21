@@ -7,6 +7,7 @@ import Square from '@/pages/Square'
 import Onboarding from '@/pages/Onboarding'
 import ProjectView from '@/pages/ProjectView'
 import ArtifactView from '@/pages/ArtifactView'
+import ShareView from '@/pages/ShareView'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Square />} />
         <Route path="/artifacts/:artifactId" element={<ArtifactView />} />
+        <Route path="/artifacts/:artifactId/share/:token" element={<ShareView />} />
       </Route>
 
       <Route element={<RequireAuth />}>

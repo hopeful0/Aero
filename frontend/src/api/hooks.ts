@@ -18,6 +18,9 @@ import type {
   NewVersionResult,
   Project,
   PublishResult,
+  ShareTokenCreateResult,
+  ShareTokenReadResult,
+  ShareTokenRevokeResult,
   VersionBlock,
 } from './types'
 
@@ -295,6 +298,35 @@ export function useRevokeAgentScope(agentId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.agentScopes() })
     },
+  })
+}
+
+// A-1 匿名定向分享链接
+export function useCreateShareToken() {
+  return useMutation<ShareTokenCreateResult, Error, { artifactId: string }>({
+    mutationFn: ({ artifactId }) =>
+      http.post<ShareTokenCreateResult>(`/artifacts/${artifactId}/share-tokens`),
+    // token 一次性返回不入列表，无需失效 artifact 级缓存；失败信息由 UI 展示。
+  })
+}
+
+export function useRevokeShareToken() {
+  const qc = useQueryClient()
+  return useMutation<ShareTokenRevokeResult, Error, { artifactId: string; tokenId: string }>({
+    mutationFn: ({ artifactId, tokenId }) =>
+      http.delete<ShareTokenRevokeResult>(`/artifacts/${artifactId}/share-tokens/${tokenId}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['shareTokens'] })
+    },
+  })
+}
+
+export function useShareTokenRead(artifactId: string | undefined, token: string | undefined) {
+  return useQuery<ShareTokenReadResult>({
+    queryKey: ['shareTokenRead', artifactId, token],
+    queryFn: () =>
+      http.get<ShareTokenReadResult>(`/artifacts/${artifactId}/share/${token}`),
+    enabled: Boolean(artifactId && token),
   })
 }
 

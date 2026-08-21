@@ -1296,6 +1296,46 @@ textarea {
   margin-top: 12px;
 }
 
+.share-control__token {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.share-control__token-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.share-control__token-hint {
+  font-size: 12px;
+  text-align: right;
+  max-width: 260px;
+}
+
+.share-control__token-box {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.share-control__token-url {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 4px;
+}
+
 /* ---------- Block anchor hover ---------- */
 [data-block-id] {
   cursor: pointer;

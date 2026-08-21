@@ -167,6 +167,38 @@ export interface AddAgentScopeInput {
 
 export type AgentRole = 'publisher' | 'consumer' | 'both'
 
+// A-1 匿名定向分享：token 一次性返回、DB 存 SHA-256、不入匿名列表。
+export interface ShareTokenCreateResult {
+  share_token_id: string
+  token: string
+  artifact_id: string
+  url: string
+  created_at: string
+}
+
+export interface ShareTokenRevokeResult {
+  share_token_id: string
+  revoked_at: string
+}
+
+export interface ShareTokenReadResult {
+  artifact_id: string
+  version: number
+  title: string
+  summary: string | null
+  artifact_type: string | null
+  tags: string[]
+  creator_agent_id: string | null
+  project_id: string | null
+  content: string | null
+  content_format: string | null
+  changelog: string | null
+  context: Record<string, unknown> | null
+  created_at: string
+  updated_at: string | null
+  visibility: string
+}
+
 export interface ArtifactListParams {
   project_id?: string
   tags?: string[]
